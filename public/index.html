@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test API SellerAmp ROI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result h3 {
+            margin-bottom: 0.5rem;
+        }
+
+        .roi-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Test API SellerAmp ROI</h1>
+            <p>Calculez le ROI de vos produits facilement</p>
+        </div>
+
+        <div class="info">
+            <strong>ℹ️ Information :</strong> Cette interface teste l'API SellerAmp ROI. 
+            Assurez-vous que le serveur est démarré et que vos credentials sont configurés dans le fichier .env.
+        </div>
+
+        <form id="roiForm">
+            <div class="form-group">
+                <label for="code">Code produit (UPC/EAN/ASIN) :</label>
+                <input type="text" id="code" name="code" placeholder="Ex: 0020714146559" required>
+            </div>
+
+            <div class="form-group">
+                <label for="prix">Prix (€) :</label>
+                <input type="number" id="prix" name="prix" step="0.01" min="0" placeholder="Ex: 25.99" required>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                Calculer le ROI
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Calcul en cours... Cela peut prendre quelques secondes.</p>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('roiForm');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const code = document.getElementById('code').value.trim();
+            const prix = parseFloat(document.getElementById('prix').value);
+
+            if (!code || !prix || prix <= 0) {
+                showResult('error', 'Veuillez remplir tous les champs correctement.');
+                return;
+            }
+
+            // Afficher le loading
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Calcul en cours...';
+
+            try {
+                const response = await fetch('/api/roi', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code, prix })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showResult('success', `
+                        <h3>✅ ROI calculé avec succès !</h3>
+                        <p><strong>Code :</strong> ${data.code}</p>
+                        <p><strong>Prix :</strong> ${data.prix}€</p>
+                        <p><strong>ROI :</strong> <span class="roi-value">${data.roi}</span></p>
+                    `);
+                } else {
+                    showResult('error', `
+                        <h3>❌ Erreur</h3>
+                        <p>${data.erreur || data.message || 'Une erreur est survenue'}</p>
+                    `);
+                }
+            } catch (error) {
+                showResult('error', `
+                    <h3>❌ Erreur de connexion</h3>
+                    <p>Impossible de contacter l'API. Vérifiez que le serveur est démarré.</p>
+                    <p><strong>Détail :</strong> ${error.message}</p>
+                `);
+            } finally {
+                // Masquer le loading
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Calculer le ROI';
+            }
+        });
+
+        function showResult(type, content) {
+            result.className = `result ${type}`;
+            result.innerHTML = content;
+            result.style.display = 'block';
+            result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Test de l'API au chargement de la page
+        async function checkApiHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                console.log('✅ API Health Check:', data);
+            } catch (error) {
+                console.error('❌ API non accessible:', error);
+                showResult('error', `
+                    <h3>⚠️ Serveur non accessible</h3>
+                    <p>L'API ne semble pas fonctionner. Vérifiez que le serveur est démarré avec <code>npm start</code>.</p>
+                `);
+            }
+        }
+
+        // Vérifier l'état de l'API au chargement
+        checkApiHealth();
+    </script>
+</body>
+</html> 
