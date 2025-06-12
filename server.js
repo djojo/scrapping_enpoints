@@ -33,7 +33,11 @@ async function taperHumain(page, selector, texte) {
 async function calculerROI(code, prix) {
   console.log(`Calcul du ROI pour le code: ${code} avec le prix: ${prix}`);
   
-  const browser = await puppeteer.launch({
+  // Configuration adaptative selon l'environnement
+  const isLinux = process.platform === 'linux';
+  const isMac = process.platform === 'darwin';
+  
+  let browserConfig = {
     headless: "new",
     defaultViewport: { width: 1366, height: 768 },
     args: [
@@ -42,9 +46,37 @@ async function calculerROI(code, prix) {
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--disable-gpu',
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=TranslateUI',
+      '--disable-ipc-flooding-protection',
       '--window-size=1366,768'
     ]
-  });
+  };
+
+  // Configuration spécifique à Linux (serveur)
+  if (isLinux) {
+    browserConfig.executablePath = process.env.CHROME_PATH || '/usr/bin/chromium-browser';
+    browserConfig.args.push('--single-process', '--no-zygote');
+  }
+
+  // Configuration spécifique à macOS (local)
+  if (isMac) {
+    // Utiliser Chrome par défaut de Puppeteer sur macOS
+    // Pas besoin d'executablePath, Puppeteer gérera automatiquement
+  }
+
+  console.log(`🖥️  Plateforme détectée: ${process.platform}`);
+  if (browserConfig.executablePath) {
+    console.log(`🌐 Utilisation de: ${browserConfig.executablePath}`);
+  } else {
+    console.log(`🌐 Utilisation du navigateur par défaut de Puppeteer`);
+  }
+
+  const browser = await puppeteer.launch(browserConfig);
   
   try {
     const page = await browser.newPage();
@@ -135,17 +167,51 @@ async function calculerROI(code, prix) {
     
     // Attendre que les résultats se chargent et que le champ prix soit disponible
     console.log('📍 Étape 9: Attente du champ prix...');
-    await page.waitForSelector('#qi_cost', { timeout: 15000 });
+    
+    // Essayer plusieurs sélecteurs pour le champ prix
+    let prixSelector = null;
+    try {
+      await page.waitForSelector('input#qi_cost.roi_to_sp.money-input', { timeout: 5000 });
+      prixSelector = 'input#qi_cost.roi_to_sp.money-input';
+      console.log('📍 Champ prix trouvé avec sélecteur complet');
+    } catch (error) {
+      await page.waitForSelector('#qi_cost', { timeout: 10000 });
+      prixSelector = '#qi_cost';
+      console.log('📍 Champ prix trouvé avec sélecteur simple');
+    }
     
     // Simuler un mouvement vers le champ prix
-    await page.hover('#qi_cost');
+    await page.hover(prixSelector);
     await delaiHumain(500, 1000);
     
-    // Entrer le prix avec frappe humaine
+    // Entrer le prix avec une approche plus robuste pour les champs money-input
     console.log('📍 Étape 10: Saisie du prix...');
-    await page.evaluate(() => document.querySelector('#qi_cost').value = '');
-    await delaiHumain(300, 600);
-    await taperHumain(page, '#qi_cost', prix.toString());
+    
+    // Cliquer sur le champ pour le focus
+    await page.click(prixSelector);
+    await delaiHumain(200, 400);
+    
+    // Sélectionner tout le contenu existant et le remplacer
+    await page.keyboard.down('Control');
+    await page.keyboard.press('KeyA');
+    await page.keyboard.up('Control');
+    await delaiHumain(100, 200);
+    
+    // Taper le nouveau prix caractère par caractère
+    for (let char of prix.toString()) {
+      await page.keyboard.type(char);
+      await delaiHumain(100, 300);
+    }
+    
+    // Alternative : déclencher les événements input/change pour les champs avec validation
+    await page.evaluate((selector, value) => {
+      const input = document.querySelector(selector);
+      if (input) {
+        input.value = value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, prixSelector, prix.toString());
     
     // Pause avant d'appuyer sur Entrée
     await delaiHumain(1000, 2000);
