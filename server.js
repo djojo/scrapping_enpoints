@@ -172,17 +172,23 @@ async function calculerROI(code, prix) {
     
     // Attendre que les résultats se chargent et que le champ prix soit disponible
     console.log('📍 Étape 9: Attente du champ prix...');
-    
-    // Essayer plusieurs sélecteurs pour le champ prix
     let prixSelector = null;
     try {
       await page.waitForSelector('input#qi_cost.roi_to_sp.money-input', { timeout: 5000 });
       prixSelector = 'input#qi_cost.roi_to_sp.money-input';
       console.log('📍 Champ prix trouvé avec sélecteur complet');
     } catch (error) {
-      await page.waitForSelector('#qi_cost', { timeout: 10000 });
-      prixSelector = '#qi_cost';
-      console.log('📍 Champ prix trouvé avec sélecteur simple');
+      try {
+        await page.waitForSelector('#qi_cost', { timeout: 10000 });
+        prixSelector = '#qi_cost';
+        console.log('📍 Champ prix trouvé avec sélecteur simple');
+      } catch (error2) {
+        // Si aucun champ prix n'est trouvé, retourner une erreur explicite
+        return {
+          success: false,
+          error: "Champ prix (#qi_cost) introuvable sur la page."
+        };
+      }
     }
     
     // Simuler un mouvement vers le champ prix
@@ -239,13 +245,33 @@ async function calculerROI(code, prix) {
     console.log('📍 Étape 13: Récupération du ROI...');
     const roi = await page.$eval('#saslookup-roi', element => element.textContent.trim());
     
+    // Récupérer les ventes estimées par mois
+    console.log('📍 Étape 14: Récupération des ventes estimées...');
+    let estimatedSales = 'N/A';
+    try {
+      estimatedSales = await page.$eval('.estimated_sales_per_mo', element => {
+        return element.textContent.replace(/[^\d+]/g, '').trim();
+      });
+    } catch (error) {
+      console.log('⚠️ Impossible de récupérer les ventes estimées:', error.message);
+    }
+    
     console.log(`ROI calculé: ${roi}`);
-    return roi;
+    console.log(`Ventes estimées: ${estimatedSales}`);
+    
+    return {
+      success: true,
+      roi,
+      estimatedSales
+    };
     
   } catch (error) {
     console.error('❌ Erreur lors du calcul du ROI:', error);
     console.error('Stack trace:', error.stack);
-    throw error;
+    return {
+      success: false,
+      error: 'Erreur lors du calcul du ROI'
+    };
   } finally {
     await browser.close();
   }
@@ -255,31 +281,22 @@ async function calculerROI(code, prix) {
 app.post('/api/roi', async (req, res) => {
   try {
     const { code, prix } = req.body;
-    
-    // Validation des paramètres
     if (!code || !prix) {
       return res.status(400).json({
-        erreur: 'Les paramètres "code" et "prix" sont requis'
+        success: false,
+        error: 'Le code et le prix sont requis'
       });
     }
-    
-    // Calculer le ROI
-    const roi = await calculerROI(code, prix);
-    
-    res.json({
-      success: true,
-      code,
-      prix,
-      roi
-    });
-    
+    const result = await calculerROI(code, prix);
+    if (result.success === false) {
+      return res.status(400).json(result);
+    }
+    res.json(result);
   } catch (error) {
-    console.error('❌ Erreur dans l\'endpoint ROI:', error);
-    console.error('Stack trace:', error.stack);
+    console.error('Erreur lors du calcul du ROI:', error);
     res.status(500).json({
-      erreur: 'Erreur lors du calcul du ROI',
-      message: error.message,
-      details: error.stack
+      success: false,
+      error: 'Erreur lors du calcul du ROI'
     });
   }
 });
