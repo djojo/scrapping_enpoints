@@ -198,6 +198,10 @@ async function calculerROI(code, prix) {
     // Entrer le prix avec une approche plus robuste pour les champs money-input
     console.log('📍 Étape 10: Saisie du prix...');
     
+    // Calculer le prix TTC (TVA 20%)
+    const prixTTC = (parseFloat(prix) * 1.20).toFixed(2);
+    console.log(`Prix HT: ${prix}€, Prix TTC: ${prixTTC}€`);
+    
     // Cliquer sur le champ pour le focus
     await page.click(prixSelector);
     await delaiHumain(200, 400);
@@ -209,7 +213,7 @@ async function calculerROI(code, prix) {
     await delaiHumain(100, 200);
     
     // Taper le nouveau prix caractère par caractère
-    for (let char of prix.toString()) {
+    for (let char of prixTTC.toString()) {
       await page.keyboard.type(char);
       await delaiHumain(100, 300);
     }
@@ -222,7 +226,7 @@ async function calculerROI(code, prix) {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
       }
-    }, prixSelector, prix.toString());
+    }, prixSelector, prixTTC.toString());
     
     // Pause avant d'appuyer sur Entrée
     await delaiHumain(1000, 2000);
