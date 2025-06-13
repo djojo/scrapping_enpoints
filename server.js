@@ -261,6 +261,8 @@ async function calculerROI(code, prix) {
     
     return {
       success: true,
+      code,
+      prix,
       roi,
       estimatedSales
     };
