@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compteur SellerAmp</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .counter-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .counter-value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 20px 0;
+        }
+        .counter-date {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .increment-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .increment-btn:hover {
+            background-color: #2980b9;
+        }
+        .reset-btn {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .reset-btn:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="counter-container">
+        <h1>Compteur SellerAmp</h1>
+        <div class="counter-value"><%= counter %></div>
+        <div class="counter-date">Dernière mise à jour : <%= date %></div>
+        <div class="button-container">
+            <button class="increment-btn" onclick="incrementCounter()">Incrémenter</button>
+            <button class="reset-btn" onclick="resetCounter()">Réinitialiser</button>
+        </div>
+    </div>
+
+    <script>
+        async function incrementCounter() {
+            try {
+                const response = await fetch('/api/counter/increment', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    location.reload();
+                }
+            } catch (error) {
+                console.error('Erreur:', error);
+            }
+        }
+
+        async function resetCounter() {
+            if (confirm('Êtes-vous sûr de vouloir réinitialiser le compteur à 0 ?')) {
+                try {
+                    const response = await fetch('/api/counter/reset', {
+                        method: 'POST'
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        location.reload();
+                    }
+                } catch (error) {
+                    console.error('Erreur:', error);
+                }
+            }
+        }
+    </script>
+</body>
+</html> 

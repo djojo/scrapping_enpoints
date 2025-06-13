@@ -16,10 +16,15 @@ mkdir -p logs
 # Vérifier que le fichier .env existe
 if [ ! -f ".env" ]; then
     echo "⚠️  Attention: Fichier .env non trouvé."
-    echo "Créez le fichier .env avec vos credentials SellerAmp :"
+    echo "Créez le fichier .env avec vos credentials :"
     echo "SELLERAMP_EMAIL=votre_email@example.com"
     echo "SELLERAMP_PASSWORD=votre_mot_de_passe"
     echo "PORT=3000"
+    echo "DB_USER=selleramp_user"
+    echo "DB_HOST=localhost"
+    echo "DB_NAME=selleramp_db"
+    echo "DB_PASSWORD=selleramp_password"
+    echo "DB_PORT=5432"
     read -p "Voulez-vous continuer quand même ? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -30,6 +35,10 @@ fi
 # Installer les dépendances
 echo "📦 Installation des dépendances..."
 npm install --production
+
+# Configurer la base de données
+echo "🗄️  Configuration de la base de données..."
+bash setup-db.sh
 
 # Arrêter l'application si elle tourne déjà
 echo "🛑 Arrêt de l'ancienne version..."
@@ -55,6 +64,7 @@ pm2 status
 
 echo ""
 echo "🌐 L'API est maintenant accessible sur le port 3000"
+echo "📊 Le compteur est accessible sur /counter"
 echo "💡 Commandes utiles :"
 echo "   pm2 status                 - Voir le statut"
 echo "   pm2 logs selleramp-roi-api - Voir les logs"

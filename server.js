@@ -1,10 +1,15 @@
 const express = require('express');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const db = require('./db');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configuration EJS
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
 // Middleware pour parser JSON
 app.use(express.json());
@@ -291,6 +296,62 @@ app.get('/api/health', (req, res) => {
     message: 'API SellerAmp ROI fonctionne correctement',
     timestamp: new Date().toISOString()
   });
+});
+
+// Route pour afficher le compteur
+app.get('/counter', async (req, res) => {
+    try {
+        const result = await db.query('SELECT counter, date FROM counter ORDER BY id DESC LIMIT 1');
+        res.render('counter', {
+            counter: result[0].counter,
+            date: new Date(result[0].date).toLocaleString('fr-FR')
+        });
+    } catch (error) {
+        console.error('Erreur lors de la récupération du compteur:', error);
+        res.status(500).send('Erreur serveur');
+    }
+});
+
+// API pour incrémenter le compteur
+app.post('/api/counter/increment', async (req, res) => {
+    try {
+        const result = await db.run(
+            'UPDATE counter SET counter = counter + 1, date = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM counter ORDER BY id DESC LIMIT 1)'
+        );
+        const updatedCounter = await db.query('SELECT counter, date FROM counter ORDER BY id DESC LIMIT 1');
+        res.json({
+            success: true,
+            counter: updatedCounter[0].counter,
+            date: updatedCounter[0].date
+        });
+    } catch (error) {
+        console.error('Erreur lors de l\'incrémentation du compteur:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// API pour réinitialiser le compteur
+app.post('/api/counter/reset', async (req, res) => {
+    try {
+        const result = await db.run(
+            'UPDATE counter SET counter = 0, date = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM counter ORDER BY id DESC LIMIT 1)'
+        );
+        const updatedCounter = await db.query('SELECT counter, date FROM counter ORDER BY id DESC LIMIT 1');
+        res.json({
+            success: true,
+            counter: updatedCounter[0].counter,
+            date: updatedCounter[0].date
+        });
+    } catch (error) {
+        console.error('Erreur lors de la réinitialisation du compteur:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
 });
 
 // Démarrer le serveur
