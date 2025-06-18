@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const session = require('express-session');
 const db = require('./db');
 require('dotenv').config();
 
@@ -11,11 +12,50 @@ const PORT = process.env.PORT || 3000;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Middleware pour parser JSON
+// Middleware pour parser JSON et form data
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Configuration des sessions
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'selleramp-roi-secret-key-2024',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false, // true en production avec HTTPS
+        maxAge: 24 * 60 * 60 * 1000 // 24 heures
+    }
+}));
 
 // Servir les fichiers statiques depuis le dossier 'public'
 app.use(express.static('public'));
+
+// Middleware d'authentification
+const requireAuth = (req, res, next) => {
+    if (req.session && req.session.authenticated) {
+        return next();
+    } else {
+        return res.redirect('/login');
+    }
+};
+
+// Routes publiques (pas d'authentification requise)
+const publicRoutes = ['/login'];
+
+// Middleware global pour vérifier l'authentification
+app.use((req, res, next) => {
+    // Permettre l'accès aux routes publiques et aux assets
+    if (publicRoutes.includes(req.path) || req.path.startsWith('/css') || req.path.startsWith('/js') || req.path.startsWith('/images')) {
+        return next();
+    }
+    
+    // Vérifier l'authentification pour toutes les autres routes
+    if (req.session && req.session.authenticated) {
+        return next();
+    } else {
+        return res.redirect('/login');
+    }
+});
 
 // Fonction pour simuler un délai humain
 function delaiHumain(min = 500, max = 2000) {
@@ -35,7 +75,7 @@ async function taperHumain(page, selector, texte) {
 }
 
 // Fonction pour calculer le ROI via SellerAmp
-async function calculerROI(code, prix) {
+async function calculerROI(code, prix, email, password) {
   console.log(`Calcul du ROI pour le code: ${code} avec le prix: ${prix}`);
   
   // Configuration adaptative selon l'environnement
@@ -109,12 +149,12 @@ async function calculerROI(code, prix) {
     
     // Se connecter avec frappe humaine
     console.log('📍 Étape 3: Saisie des credentials...');
-    await taperHumain(page, '#loginform-email', process.env.SELLERAMP_EMAIL);
+    await taperHumain(page, '#loginform-email', email);
     await delaiHumain(500, 1500);
     
     await page.hover('#loginform-password');
     await delaiHumain(200, 600);
-    await taperHumain(page, '#loginform-password', process.env.SELLERAMP_PASSWORD);
+    await taperHumain(page, '#loginform-password', password);
     
     // Pause avant de cliquer sur le bouton de connexion
     await delaiHumain(800, 2000);
@@ -283,7 +323,271 @@ async function calculerROI(code, prix) {
   }
 }
 
-// Endpoint pour calculer le ROI
+// Fonction pour récupérer les credentials avec l'utilisation la plus ancienne
+async function getOldestCredentials() {
+  try {
+    const result = await db.query(`
+      SELECT * FROM credentials 
+      WHERE status = 'working' 
+      ORDER BY lastdateused ASC, id ASC 
+      LIMIT 1
+    `);
+    return result[0] || null;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des credentials:', error);
+    return null;
+  }
+}
+
+// Fonction pour mettre à jour l'utilisation d'un credential
+async function updateCredentialUsage(id) {
+  try {
+    await db.run(`
+      UPDATE credentials 
+      SET countused = countused + 1, lastdateused = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `, [id]);
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour du credential:', error);
+  }
+}
+
+// Endpoint de test
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    message: 'API SellerAmp ROI fonctionne correctement',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Route pour afficher les credentials
+app.get('/credentials', async (req, res) => {
+    try {
+        const credentials = await db.query('SELECT id, login, status, countused, lastdateused, created_at FROM credentials ORDER BY id DESC');
+        res.render('credentials', { credentials });
+    } catch (error) {
+        console.error('Erreur lors de la récupération des credentials:', error);
+        res.status(500).send('Erreur serveur');
+    }
+});
+
+// API CRUD pour les credentials
+// Créer un credential
+app.post('/api/credentials', async (req, res) => {
+    try {
+        const { login, password, status = 'working' } = req.body;
+        
+        if (!login || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Login et password sont requis'
+            });
+        }
+        
+        await db.run(`
+            INSERT INTO credentials (login, password, status) 
+            VALUES (?, ?, ?)
+        `, [login, password, status]);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur lors de la création du credential:', error);
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            res.status(400).json({
+                success: false,
+                error: 'Ce login existe déjà'
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Erreur serveur'
+            });
+        }
+    }
+});
+
+// Lire tous les credentials
+app.get('/api/credentials', async (req, res) => {
+    try {
+        const credentials = await db.query('SELECT id, login, status, countused, lastdateused, created_at FROM credentials ORDER BY id DESC');
+        res.json({ success: true, credentials });
+    } catch (error) {
+        console.error('Erreur lors de la récupération des credentials:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// Mettre à jour un credential
+app.put('/api/credentials/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { login, password, status } = req.body;
+        
+        if (!login) {
+            return res.status(400).json({
+                success: false,
+                error: 'Login est requis'
+            });
+        }
+        
+        let sql = 'UPDATE credentials SET login = ?, status = ? WHERE id = ?';
+        let params = [login, status, id];
+        
+        if (password) {
+            sql = 'UPDATE credentials SET login = ?, password = ?, status = ? WHERE id = ?';
+            params = [login, password, status, id];
+        }
+        
+        await db.run(sql, params);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour du credential:', error);
+        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+            res.status(400).json({
+                success: false,
+                error: 'Ce login existe déjà'
+            });
+        } else {
+            res.status(500).json({
+                success: false,
+                error: 'Erreur serveur'
+            });
+        }
+    }
+});
+
+// Supprimer un credential
+app.delete('/api/credentials/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.run('DELETE FROM credentials WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur lors de la suppression du credential:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// Route pour tester un credential
+app.post('/api/testcredentials', async (req, res) => {
+    try {
+        const { credentialId } = req.body;
+        
+        if (!credentialId) {
+            return res.status(400).json({ success: false, error: 'ID du credential requis' });
+        }
+
+        // Récupérer le credential
+        const credentialResult = await db.query('SELECT * FROM credentials WHERE id = ?', [credentialId]);
+        const credential = credentialResult[0];
+
+        if (!credential) {
+            return res.status(404).json({ success: false, error: 'Credential non trouvé' });
+        }
+
+        console.log(`🧪 Test du credential: ${credential.login}`);
+
+        // Tester la connexion avec Puppeteer
+        const browser = await puppeteer.launch({ 
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+        
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        
+        let newStatus = 'working';
+        let testResult = 'Test réussi';
+
+        try {
+            // Aller sur la page de connexion SellerAmp
+            await page.goto('https://sas.selleramp.com/site/login', { waitUntil: 'networkidle2', timeout: 30000 });
+            
+            // Remplir les champs de connexion
+            await page.waitForSelector('input[name="LoginForm[email]"]', { timeout: 10000 });
+            await page.type('input[name="LoginForm[email]"]', credential.login);
+            await page.type('input[name="LoginForm[password]"]', credential.password);
+            
+            // Cliquer sur le bouton de connexion
+            await page.click('button[name="login-button"]');
+            
+            // Attendre la redirection ou un message d'erreur
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Vérifier s'il y a un message d'erreur
+            const errorMessage = await page.evaluate(() => {
+                const errorElement = document.querySelector('.alert-danger, .alert-error, .error, [class*="error"], .help-block');
+                return errorElement ? errorElement.textContent.trim() : null;
+            });
+            
+            // Vérifier le contenu de la page pour détecter les problèmes de compte
+            const pageContent = await page.content();
+            
+            if (errorMessage && errorMessage.includes('Problem With Your Account')) {
+                newStatus = 'striked';
+                testResult = 'Compte bloqué détecté';
+            } else if (pageContent.includes('Problem With Your Account')) {
+                newStatus = 'striked';
+                testResult = 'Compte bloqué détecté';
+            } else if (errorMessage) {
+                newStatus = 'striked';
+                testResult = `Erreur de connexion: ${errorMessage}`;
+            } else {
+                // Vérifier si on est bien connecté (présence d'éléments du dashboard ou changement d'URL)
+                const currentUrl = page.url();
+                const isLoggedIn = await page.evaluate(() => {
+                    // Vérifier la présence d'éléments typiques d'une session connectée
+                    return document.querySelector('.dashboard, .user-menu, [class*="dashboard"], .navbar-nav, .dropdown-toggle') !== null ||
+                           document.title.toLowerCase().includes('dashboard') ||
+                           document.body.innerHTML.includes('logout') ||
+                           document.body.innerHTML.includes('déconnexion');
+                });
+                
+                const urlChanged = !currentUrl.includes('/site/login');
+                
+                if (!isLoggedIn && !urlChanged) {
+                    newStatus = 'striked';
+                    testResult = 'Connexion échouée - Toujours sur la page de login';
+                } else if (urlChanged || isLoggedIn) {
+                    newStatus = 'working';
+                    testResult = 'Connexion réussie';
+                }
+            }
+            
+        } catch (error) {
+            console.error('Erreur lors du test:', error);
+            newStatus = 'striked';
+            testResult = `Erreur technique: ${error.message}`;
+        }
+        
+        await browser.close();
+
+        // Mettre à jour le status dans la base de données
+        await db.run('UPDATE credentials SET status = ? WHERE id = ?', [newStatus, credentialId]);
+
+        console.log(`✅ Test terminé pour ${credential.login}: ${newStatus}`);
+
+        res.json({ 
+            success: true, 
+            newStatus: newStatus,
+            message: testResult,
+            credentialId: credentialId
+        });
+
+    } catch (error) {
+        console.error('Erreur lors du test du credential:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Endpoint pour calculer le ROI (modifié pour utiliser les credentials de la base)
 app.post('/api/roi', async (req, res) => {
   try {
     const { code, prix } = req.body;
@@ -293,7 +597,24 @@ app.post('/api/roi', async (req, res) => {
         error: 'Le code et le prix sont requis'
       });
     }
-    const result = await calculerROI(code, prix);
+    
+    // Récupérer les credentials avec l'utilisation la plus ancienne
+    const credentials = await getOldestCredentials();
+    if (!credentials) {
+      return res.status(400).json({
+        success: false,
+        error: 'Aucun credential disponible'
+      });
+    }
+    
+    // Calculer le ROI avec les credentials récupérés
+    const result = await calculerROI(code, prix, credentials.login, credentials.password);
+    
+    if (result.success) {
+      // Mettre à jour l'utilisation du credential
+      await updateCredentialUsage(credentials.id);
+    }
+    
     if (result.success === false) {
       return res.status(400).json(result);
     }
@@ -307,18 +628,45 @@ app.post('/api/roi', async (req, res) => {
   }
 });
 
-// Route racine - redirection vers l'interface
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// Routes d'authentification
+app.get('/login', (req, res) => {
+    res.render('login', { error: null });
 });
 
-// Endpoint de test
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    message: 'API SellerAmp ROI fonctionne correctement',
-    timestamp: new Date().toISOString()
-  });
+app.post('/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    // Vérification des credentials
+    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Scrapping2025!';
+    
+    if (username === adminUsername && password === adminPassword) {
+        req.session.authenticated = true;
+        req.session.username = username;
+        res.redirect('/');
+    } else {
+        res.render('login', { error: 'Nom d\'utilisateur ou mot de passe incorrect' });
+    }
+});
+
+// Route de déconnexion
+app.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Erreur lors de la déconnexion:', err);
+        }
+        res.redirect('/login');
+    });
+});
+
+// Route pour la page d'accueil
+app.get('/', (req, res) => {
+    res.render('home');
+});
+
+// Route pour la page de calcul ROI
+app.get('/roi', (req, res) => {
+    res.render('roi');
 });
 
 // Route pour afficher le compteur
@@ -332,6 +680,24 @@ app.get('/counter', async (req, res) => {
     } catch (error) {
         console.error('Erreur lors de la récupération du compteur:', error);
         res.status(500).send('Erreur serveur');
+    }
+});
+
+// API pour récupérer la valeur du compteur (pour les stats de la page d'accueil)
+app.get('/api/counter/get', async (req, res) => {
+    try {
+        const result = await db.query('SELECT counter, date FROM counter ORDER BY id DESC LIMIT 1');
+        res.json({
+            success: true,
+            counter: result[0].counter,
+            date: result[0].date
+        });
+    } catch (error) {
+        console.error('Erreur lors de la récupération du compteur:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
     }
 });
 

@@ -17,17 +17,36 @@ const db = new sqlite3.Database(path.join(__dirname, 'database.sqlite'), (err) =
             )
         `, (err) => {
             if (err) {
-                console.error('Erreur lors de la création de la table:', err);
+                console.error('Erreur lors de la création de la table counter:', err);
             } else {
                 // Vérifier si la table est vide
                 db.get('SELECT COUNT(*) as count FROM counter', (err, row) => {
                     if (err) {
-                        console.error('Erreur lors de la vérification de la table:', err);
+                        console.error('Erreur lors de la vérification de la table counter:', err);
                     } else if (row.count === 0) {
                         // Insérer l'enregistrement initial si la table est vide
                         db.run('INSERT INTO counter (counter, date) VALUES (0, CURRENT_TIMESTAMP)');
                     }
                 });
+            }
+        });
+
+        // Créer la table credentials si elle n'existe pas
+        db.run(`
+            CREATE TABLE IF NOT EXISTS credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                login TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'working' CHECK(status IN ('working', 'striked')),
+                countused INTEGER NOT NULL DEFAULT 0,
+                lastdateused TIMESTAMP DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `, (err) => {
+            if (err) {
+                console.error('Erreur lors de la création de la table credentials:', err);
+            } else {
+                console.log('✅ Table credentials créée ou vérifiée');
             }
         });
     }

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SellerAmp ROI - Accueil</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 2.5rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .welcome-message {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+        }
+
+        .welcome-message h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .welcome-message p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            opacity: 0.95;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 2rem 0;
+        }
+
+        .feature-item {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .feature-item h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .feature-item p {
+            color: #666;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 2rem;
+        }
+
+        .menu-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-decoration: none;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+
+        .menu-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .menu-card .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .menu-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .menu-card p {
+            opacity: 0.9;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        .stats {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-top: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 SellerAmp ROI</h1>
+            <p>Plateforme de calcul de ROI et gestion des comptes SellerAmp</p>
+        </div>
+
+        <div class="welcome-message">
+            <h2>👋 Bienvenue sur votre plateforme ROI !</h2>
+            <p>Cette application vous permet de calculer automatiquement le ROI de vos produits via SellerAmp, de gérer vos comptes et de suivre vos utilisations. Naviguez dans les différentes sections pour commencer.</p>
+        </div>
+
+        <div class="features">
+            <div class="feature-item">
+                <span class="feature-icon">⚡</span>
+                <h3>Calcul Automatique</h3>
+                <p>ROI calculé automatiquement avec rotation des comptes</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🔄</span>
+                <h3>Rotation Intelligente</h3>
+                <p>Utilisation équilibrée de tous vos comptes SellerAmp</p>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📈</span>
+                <h3>Suivi Détaillé</h3>
+                <p>Statistiques d'utilisation et historique complet</p>
+            </div>
+        </div>
+
+        <div class="menu-grid">
+            <a href="/roi" class="menu-card">
+                <span class="icon">📊</span>
+                <h3>Calculer ROI</h3>
+                <p>Calculez le ROI de vos produits avec SellerAmp</p>
+            </a>
+
+            <a href="/credentials" class="menu-card">
+                <span class="icon">🔐</span>
+                <h3>Gestion Comptes</h3>
+                <p>Gérez vos credentials SellerAmp</p>
+            </a>
+
+            <a href="/counter" class="menu-card">
+                <span class="icon">🔢</span>
+                <h3>Compteur</h3>
+                <p>Visualisez et gérez le compteur d'utilisation</p>
+            </a>
+
+            <a href="/api/health" class="menu-card" target="_blank">
+                <span class="icon">💚</span>
+                <h3>API Health</h3>
+                <p>Vérifiez l'état de l'API</p>
+            </a>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <span class="stat-number" id="credentialsCount">-</span>
+                <div class="stat-label">Comptes configurés</div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="counterValue">-</span>
+                <div class="stat-label">Utilisations totales</div>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="apiStatus">-</span>
+                <div class="stat-label">Statut API</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>API SellerAmp ROI - Automatisation du calcul de rentabilité</p>
+        </div>
+    </div>
+
+    <script>
+        // Charger les statistiques
+        async function loadStats() {
+            try {
+                // Vérifier l'état de l'API
+                const healthResponse = await fetch('/api/health');
+                const healthData = await healthResponse.json();
+                document.getElementById('apiStatus').textContent = healthData.status === 'OK' ? '✅ OK' : '❌ KO';
+
+                // Charger le nombre de credentials
+                const credentialsResponse = await fetch('/api/credentials');
+                const credentialsData = await credentialsResponse.json();
+                document.getElementById('credentialsCount').textContent = credentialsData.credentials ? credentialsData.credentials.length : '0';
+
+                // Charger la valeur du compteur
+                const counterResponse = await fetch('/api/counter/get');
+                if (counterResponse.ok) {
+                    const counterData = await counterResponse.json();
+                    document.getElementById('counterValue').textContent = counterData.counter || '0';
+                } else {
+                    document.getElementById('counterValue').textContent = '0';
+                }
+            } catch (error) {
+                console.error('Erreur lors du chargement des statistiques:', error);
+                document.getElementById('apiStatus').textContent = '❌ Erreur';
+            }
+        }
+
+        // Charger les stats au chargement de la page
+        loadStats();
+    </script>
+</body>
+</html> 

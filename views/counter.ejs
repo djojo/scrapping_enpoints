@@ -7,10 +7,15 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
             background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .main-content {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 20px;
         }
         .counter-container {
             background-color: white;
@@ -64,13 +69,17 @@
     </style>
 </head>
 <body>
-    <div class="counter-container">
-        <h1>Compteur SellerAmp</h1>
-        <div class="counter-value"><%= counter %></div>
-        <div class="counter-date">Dernière mise à jour : <%= date %></div>
-        <div class="button-container">
-            <button class="increment-btn" onclick="incrementCounter()">Incrémenter</button>
-            <button class="reset-btn" onclick="resetCounter()">Réinitialiser</button>
+    <%- include('partials/navbar', { currentPage: 'counter' }) %>
+
+    <div class="main-content">
+        <div class="counter-container">
+            <h1>Compteur SellerAmp</h1>
+            <div class="counter-value"><%= counter %></div>
+            <div class="counter-date">Dernière mise à jour : <%= date %></div>
+            <div class="button-container">
+                <button class="increment-btn" onclick="incrementCounter()">Incrémenter</button>
+                <button class="reset-btn" onclick="resetCounter()">Réinitialiser</button>
+            </div>
         </div>
     </div>
 

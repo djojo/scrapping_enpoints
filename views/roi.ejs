@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test API SellerAmp ROI</title>
+    <title>Calculer ROI - SellerAmp</title>
     <style>
         * {
             margin: 0;
@@ -13,11 +13,13 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #f5f5f5;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        }
+
+        .main-content {
+            max-width: 600px;
+            margin: 2rem auto;
             padding: 20px;
         }
 
@@ -26,8 +28,6 @@
             padding: 2rem;
             border-radius: 15px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 500px;
         }
 
         .header {
@@ -156,42 +156,45 @@
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🚀 Test API SellerAmp ROI</h1>
-            <p>Calculez le ROI de vos produits facilement</p>
-        </div>
+    <%- include('partials/navbar', { currentPage: 'roi' }) %>
 
-        <!-- <div class="info">
-            <strong>ℹ️ Information :</strong> Cette interface teste l'API SellerAmp ROI. 
-            Assurez-vous que le serveur est démarré et que vos credentials sont configurés dans le fichier .env.
-        </div> -->
-
-        <form id="roiForm">
-            <div class="form-group">
-                <label for="code">Code produit (UPC/EAN/ASIN) :</label>
-                <input type="text" id="code" name="code" placeholder="Ex: 0020714146559" required>
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1>📊 Calculer le ROI</h1>
+                <p>Calculez le ROI de vos produits facilement</p>
             </div>
 
-            <div class="form-group">
-                <label for="prix">Prix HT (€) :</label>
-                <input type="number" id="prix" name="prix" step="0.01" min="0" placeholder="Ex: 25.99" required>
-                <small style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.5rem;">
-                    La TVA de 20% sera automatiquement ajoutée pour le calcul du ROI
-                </small>
+            <div class="info">
+                <strong>ℹ️ Information :</strong> Le prix saisi est HT. La TVA de 20% sera automatiquement ajoutée pour le calcul du ROI.
             </div>
 
-            <button type="submit" class="btn" id="submitBtn">
-                Calculer le ROI
-            </button>
-        </form>
+            <form id="roiForm">
+                <div class="form-group">
+                    <label for="code">Code produit (UPC/EAN/ASIN) :</label>
+                    <input type="text" id="code" name="code" placeholder="Ex: 0020714146559" required>
+                </div>
 
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Calcul en cours... Cela peut prendre quelques secondes.</p>
+                <div class="form-group">
+                    <label for="prix">Prix HT (€) :</label>
+                    <input type="number" id="prix" name="prix" step="0.01" min="0" placeholder="Ex: 25.99" required>
+                    <small style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.5rem;">
+                        La TVA de 20% sera automatiquement ajoutée pour le calcul du ROI
+                    </small>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">
+                    Calculer le ROI
+                </button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Calcul en cours... Cela peut prendre quelques secondes.</p>
+            </div>
+
+            <div class="result" id="result"></div>
         </div>
-
-        <div class="result" id="result"></div>
     </div>
 
     <script>
@@ -235,11 +238,12 @@
                         <p><strong>Prix HT :</strong> ${data.prix}€</p>
                         <p><strong>Prix TTC :</strong> ${(parseFloat(data.prix) * 1.20).toFixed(2)}€</p>
                         <p><strong>ROI :</strong> <span class="roi-value">${data.roi}</span></p>
+                        ${data.estimatedSales ? `<p><strong>Ventes estimées :</strong> ${data.estimatedSales}/mois</p>` : ''}
                     `);
                 } else {
                     showResult('error', `
                         <h3>❌ Erreur</h3>
-                        <p>${data.erreur || data.message || 'Une erreur est survenue'}</p>
+                        <p>${data.error || 'Une erreur est survenue'}</p>
                     `);
                 }
             } catch (error) {
@@ -262,24 +266,6 @@
             result.style.display = 'block';
             result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
-
-        // Test de l'API au chargement de la page
-        async function checkApiHealth() {
-            try {
-                const response = await fetch('/api/health');
-                const data = await response.json();
-                console.log('✅ API Health Check:', data);
-            } catch (error) {
-                console.error('❌ API non accessible:', error);
-                showResult('error', `
-                    <h3>⚠️ Serveur non accessible</h3>
-                    <p>L'API ne semble pas fonctionner. Vérifiez que le serveur est démarré avec <code>npm start</code>.</p>
-                `);
-            }
-        }
-
-        // Vérifier l'état de l'API au chargement
-        checkApiHealth();
     </script>
 </body>
 </html> 

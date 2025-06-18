@@ -1,0 +1,139 @@
+<nav class="navbar">
+    <div class="nav-container">
+        <a href="/" class="nav-brand">
+            <span class="nav-icon">🚀</span>
+            SellerAmp ROI
+        </a>
+        <ul class="nav-menu">
+            <li class="nav-item">
+                <a href="/" class="nav-link <%= currentPage === 'home' ? 'active' : '' %>">
+                    <span class="nav-icon">🏠</span>
+                    Accueil
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/roi" class="nav-link <%= currentPage === 'roi' ? 'active' : '' %>">
+                    <span class="nav-icon">📊</span>
+                    Calculer ROI
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/credentials" class="nav-link <%= currentPage === 'credentials' ? 'active' : '' %>">
+                    <span class="nav-icon">🔐</span>
+                    Comptes
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/counter" class="nav-link <%= currentPage === 'counter' ? 'active' : '' %>">
+                    <span class="nav-icon">🔢</span>
+                    Compteur
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="/logout" class="nav-link logout-btn">
+                    <span class="nav-icon">🚪</span>
+                    Déconnexion
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<style>
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1rem 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: white;
+    text-decoration: none;
+    font-size: 1.5rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.nav-brand:hover {
+    color: #f0f0f0;
+}
+
+.nav-menu {
+    display: flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    gap: 1rem;
+}
+
+.nav-item {
+    margin: 0;
+}
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.nav-link.active {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.nav-icon {
+    font-size: 1.1rem;
+}
+
+.logout-btn {
+    background-color: rgba(220, 53, 69, 0.2);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.logout-btn:hover {
+    background-color: rgba(220, 53, 69, 0.3);
+    border-color: rgba(220, 53, 69, 0.5);
+}
+
+@media (max-width: 768px) {
+    .nav-container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .nav-menu {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .nav-link {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.9rem;
+    }
+}
+</style> 
