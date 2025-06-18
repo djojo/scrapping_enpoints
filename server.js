@@ -44,12 +44,16 @@ const publicRoutes = ['/login'];
 
 // Middleware global pour vérifier l'authentification
 app.use((req, res, next) => {
-    // Permettre l'accès aux routes publiques et aux assets
-    if (publicRoutes.includes(req.path) || req.path.startsWith('/css') || req.path.startsWith('/js') || req.path.startsWith('/images')) {
+    // Permettre l'accès aux routes publiques, aux assets et aux API
+    if (publicRoutes.includes(req.path) || 
+        req.path.startsWith('/css') || 
+        req.path.startsWith('/js') || 
+        req.path.startsWith('/images') ||
+        req.path.startsWith('/api/')) {
         return next();
     }
     
-    // Vérifier l'authentification pour toutes les autres routes
+    // Vérifier l'authentification pour les pages web uniquement
     if (req.session && req.session.authenticated) {
         return next();
     } else {
@@ -61,6 +65,34 @@ app.use((req, res, next) => {
 function delaiHumain(min = 500, max = 2000) {
   const delai = Math.floor(Math.random() * (max - min + 1)) + min;
   return new Promise(resolve => setTimeout(resolve, delai));
+}
+
+// Fonction pour nettoyer les fichiers temporaires Puppeteer
+function cleanupPuppeteerTempFiles() {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  
+  try {
+    const tmpDir = os.tmpdir();
+    const files = fs.readdirSync(tmpDir);
+    
+    files.forEach(file => {
+      if (file.startsWith('puppeteer_dev_chrome_profile-')) {
+        const fullPath = path.join(tmpDir, file);
+        try {
+          // Supprimer récursivement le dossier
+          fs.rmSync(fullPath, { recursive: true, force: true });
+          console.log(`🧹 Nettoyé: ${file}`);
+        } catch (error) {
+          // Ignorer les erreurs de suppression (fichiers en cours d'utilisation)
+          console.log(`⚠️  Impossible de nettoyer: ${file} (probablement en cours d'utilisation)`);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors du nettoyage des fichiers temporaires:', error.message);
+  }
 }
 
 // Fonction pour taper comme un humain
@@ -85,6 +117,7 @@ async function calculerROI(code, prix, email, password) {
   let browserConfig = {
     headless: "new",
     defaultViewport: { width: 1366, height: 768 },
+    userDataDir: null, // Forcer l'utilisation d'un répertoire temporaire qui sera nettoyé
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -98,7 +131,11 @@ async function calculerROI(code, prix, email, password) {
       '--disable-renderer-backgrounding',
       '--disable-features=TranslateUI',
       '--disable-ipc-flooding-protection',
-      '--window-size=1366,768'
+      '--window-size=1366,768',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--temp-profile', // Utiliser un profil temporaire
+      '--incognito' // Mode incognito pour éviter la persistance
     ]
   };
 
@@ -497,7 +534,16 @@ app.post('/api/testcredentials', async (req, res) => {
         // Tester la connexion avec Puppeteer
         const browser = await puppeteer.launch({ 
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            userDataDir: null, // Forcer l'utilisation d'un répertoire temporaire qui sera nettoyé
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--temp-profile',
+                '--incognito'
+            ]
         });
         
         const page = await browser.newPage();
@@ -750,8 +796,33 @@ app.listen(PORT, () => {
   console.log(`💚 Health check: http://localhost:${PORT}/api/health`);
   console.log(`📊 Endpoint ROI: POST http://localhost:${PORT}/api/roi`);
   
+  // Nettoyage initial des fichiers temporaires Puppeteer
+  console.log('🧹 Nettoyage des fichiers temporaires Puppeteer...');
+  cleanupPuppeteerTempFiles();
+  
+  // Programmer un nettoyage automatique toutes les heures
+  setInterval(() => {
+    console.log('🧹 Nettoyage périodique des fichiers temporaires Puppeteer...');
+    cleanupPuppeteerTempFiles();
+  }, 60 * 60 * 1000); // 1 heure
+  
   // Vérifier que les variables d'environnement sont définies
   if (!process.env.SELLERAMP_EMAIL || !process.env.SELLERAMP_PASSWORD) {
     console.warn('⚠️  ATTENTION: Les variables SELLERAMP_EMAIL et SELLERAMP_PASSWORD doivent être définies dans le fichier .env');
   }
+});
+
+// Nettoyage lors de la fermeture du serveur
+process.on('SIGINT', () => {
+  console.log('\n🛑 Arrêt du serveur...');
+  console.log('🧹 Nettoyage final des fichiers temporaires Puppeteer...');
+  cleanupPuppeteerTempFiles();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Arrêt du serveur...');
+  console.log('🧹 Nettoyage final des fichiers temporaires Puppeteer...');
+  cleanupPuppeteerTempFiles();
+  process.exit(0);
 }); 
