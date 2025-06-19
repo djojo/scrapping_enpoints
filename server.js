@@ -107,8 +107,11 @@ async function taperHumain(page, selector, texte) {
 }
 
 // Fonction pour calculer le ROI via SellerAmp
-async function calculerROI(code, prix, email, password) {
+async function calculerROI(code, prix, email, password, proxyIp = null, proxyPort = null) {
   console.log(`Calcul du ROI pour le code: ${code} avec le prix: ${prix}`);
+  if (proxyIp && proxyPort) {
+    console.log(`🌐 Utilisation du proxy: ${proxyIp}:${proxyPort}`);
+  }
   
   // Configuration adaptative selon l'environnement
   const isLinux = process.platform === 'linux';
@@ -139,6 +142,11 @@ async function calculerROI(code, prix, email, password) {
     ]
   };
 
+  // Ajouter la configuration proxy si fournie
+  if (proxyIp && proxyPort) {
+    browserConfig.args.push(`--proxy-server=http://${proxyIp}:${proxyPort}`);
+  }
+
   // Configuration spécifique à Linux (serveur)
   if (isLinux) {
     browserConfig.executablePath = process.env.CHROME_PATH || '/usr/bin/chromium-browser';
@@ -162,6 +170,19 @@ async function calculerROI(code, prix, email, password) {
   
   try {
     const page = await browser.newPage();
+    
+    // Authentification proxy si nécessaire
+    if (proxyIp && proxyPort) {
+      // Récupérer les informations d'authentification proxy
+      const proxyAuth = await getProxyAuth();
+      if (proxyAuth) {
+        await page.authenticate({
+          username: proxyAuth.username,
+          password: proxyAuth.password
+        });
+        console.log(`🔐 Authentification proxy configurée`);
+      }
+    }
     
     // Définir un User-Agent réaliste
     await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
@@ -376,6 +397,21 @@ async function getOldestCredentials() {
   }
 }
 
+// Fonction pour récupérer les informations d'authentification proxy
+async function getProxyAuth() {
+  try {
+    const result = await db.query(`
+      SELECT * FROM proxy 
+      ORDER BY id DESC 
+      LIMIT 1
+    `);
+    return result[0] || null;
+  } catch (error) {
+    console.error('Erreur lors de la récupération des informations proxy:', error);
+    return null;
+  }
+}
+
 // Fonction pour mettre à jour l'utilisation d'un credential
 async function updateCredentialUsage(id) {
   try {
@@ -401,10 +437,21 @@ app.get('/api/health', (req, res) => {
 // Route pour afficher les credentials
 app.get('/credentials', async (req, res) => {
     try {
-        const credentials = await db.query('SELECT id, login, status, countused, lastdateused, created_at FROM credentials ORDER BY id DESC');
+        const credentials = await db.query('SELECT id, login, ip, port, status, proxy_status, countused, lastdateused, created_at FROM credentials ORDER BY id DESC');
         res.render('credentials', { credentials });
     } catch (error) {
         console.error('Erreur lors de la récupération des credentials:', error);
+        res.status(500).send('Erreur serveur');
+    }
+});
+
+// Route pour afficher les proxies
+app.get('/proxy', async (req, res) => {
+    try {
+        const proxies = await db.query('SELECT * FROM proxy ORDER BY created_at DESC');
+        res.render('proxy', { proxies });
+    } catch (error) {
+        console.error('Erreur lors de la récupération des proxies:', error);
         res.status(500).send('Erreur serveur');
     }
 });
@@ -413,7 +460,7 @@ app.get('/credentials', async (req, res) => {
 // Créer un credential
 app.post('/api/credentials', async (req, res) => {
     try {
-        const { login, password, status = 'working' } = req.body;
+        const { login, password, ip, port, status = 'working' } = req.body;
         
         if (!login || !password) {
             return res.status(400).json({
@@ -423,9 +470,9 @@ app.post('/api/credentials', async (req, res) => {
         }
         
         await db.run(`
-            INSERT INTO credentials (login, password, status) 
-            VALUES (?, ?, ?)
-        `, [login, password, status]);
+            INSERT INTO credentials (login, password, ip, port, status) 
+            VALUES (?, ?, ?, ?, ?)
+        `, [login, password, ip || null, port || null, status]);
         
         res.json({ success: true });
     } catch (error) {
@@ -447,7 +494,7 @@ app.post('/api/credentials', async (req, res) => {
 // Lire tous les credentials
 app.get('/api/credentials', async (req, res) => {
     try {
-        const credentials = await db.query('SELECT id, login, status, countused, lastdateused, created_at FROM credentials ORDER BY id DESC');
+        const credentials = await db.query('SELECT id, login, ip, port, status, proxy_status, countused, lastdateused, created_at FROM credentials ORDER BY id DESC');
         res.json({ success: true, credentials });
     } catch (error) {
         console.error('Erreur lors de la récupération des credentials:', error);
@@ -462,7 +509,7 @@ app.get('/api/credentials', async (req, res) => {
 app.put('/api/credentials/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const { login, password, status } = req.body;
+        const { login, password, ip, port, status } = req.body;
         
         if (!login) {
             return res.status(400).json({
@@ -471,12 +518,12 @@ app.put('/api/credentials/:id', async (req, res) => {
             });
         }
         
-        let sql = 'UPDATE credentials SET login = ?, status = ? WHERE id = ?';
-        let params = [login, status, id];
+        let sql = 'UPDATE credentials SET login = ?, ip = ?, port = ?, status = ? WHERE id = ?';
+        let params = [login, ip || null, port || null, status, id];
         
         if (password) {
-            sql = 'UPDATE credentials SET login = ?, password = ?, status = ? WHERE id = ?';
-            params = [login, password, status, id];
+            sql = 'UPDATE credentials SET login = ?, password = ?, ip = ?, port = ?, status = ? WHERE id = ?';
+            params = [login, password, ip || null, port || null, status, id];
         }
         
         await db.run(sql, params);
@@ -509,6 +556,201 @@ app.delete('/api/credentials/:id', async (req, res) => {
             success: false,
             error: 'Erreur serveur'
         });
+    }
+});
+
+// API CRUD pour les proxies
+// Créer un proxy
+app.post('/api/proxy', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username et password sont requis'
+            });
+        }
+        
+        await db.run(`
+            INSERT INTO proxy (username, password) 
+            VALUES (?, ?)
+        `, [username, password]);
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur lors de la création du proxy:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// Lire tous les proxies
+app.get('/api/proxy', async (req, res) => {
+    try {
+        const proxies = await db.query('SELECT id, username, created_at FROM proxy ORDER BY id DESC');
+        res.json({ success: true, proxies });
+    } catch (error) {
+        console.error('Erreur lors de la récupération des proxies:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// Mettre à jour un proxy
+app.put('/api/proxy/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { username, password } = req.body;
+        
+        if (!username) {
+            return res.status(400).json({
+                success: false,
+                error: 'Username est requis'
+            });
+        }
+        
+        let sql = 'UPDATE proxy SET username = ? WHERE id = ?';
+        let params = [username, id];
+        
+        if (password) {
+            sql = 'UPDATE proxy SET username = ?, password = ? WHERE id = ?';
+            params = [username, password, id];
+        }
+        
+        await db.run(sql, params);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour du proxy:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// Supprimer un proxy
+app.delete('/api/proxy/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.run('DELETE FROM proxy WHERE id = ?', [id]);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Erreur lors de la suppression du proxy:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Erreur serveur'
+        });
+    }
+});
+
+// Route pour tester un proxy
+app.post('/api/testproxy', async (req, res) => {
+    try {
+        const { credentialId } = req.body;
+        
+        if (!credentialId) {
+            return res.status(400).json({ success: false, error: 'ID du credential requis' });
+        }
+
+        // Récupérer le credential avec IP et port
+        const credentialResult = await db.query('SELECT * FROM credentials WHERE id = ?', [credentialId]);
+        const credential = credentialResult[0];
+
+        if (!credential) {
+            return res.status(404).json({ success: false, error: 'Credential non trouvé' });
+        }
+
+        if (!credential.ip || !credential.port) {
+            return res.status(400).json({ success: false, error: 'IP et port requis pour tester le proxy' });
+        }
+
+        // Récupérer les informations d'authentification proxy
+        const proxyAuth = await getProxyAuth();
+        if (!proxyAuth) {
+            return res.status(400).json({ success: false, error: 'Informations d\'authentification proxy non configurées' });
+        }
+
+        console.log(`🌐 Test du proxy: ${credential.ip}:${credential.port}`);
+
+        const startTime = Date.now();
+
+        // Tester la connexion proxy avec Puppeteer
+        const browser = await puppeteer.launch({ 
+            headless: true,
+            userDataDir: null,
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--temp-profile',
+                '--incognito',
+                `--proxy-server=http://${credential.ip}:${credential.port}`
+            ]
+        });
+        
+        const page = await browser.newPage();
+        
+        // Authentification proxy
+        await page.authenticate({
+            username: proxyAuth.username,
+            password: proxyAuth.password
+        });
+
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+        
+        try {
+            // Tester la connexion en allant sur un service de détection d'IP
+            await page.goto('https://httpbin.org/ip', { waitUntil: 'networkidle2', timeout: 30000 });
+            
+            const responseTime = Date.now() - startTime;
+            
+            // Récupérer l'IP détectée
+            const ipInfo = await page.evaluate(() => {
+                try {
+                    const bodyText = document.body.textContent;
+                    const parsed = JSON.parse(bodyText);
+                    return parsed.origin;
+                } catch (e) {
+                    return document.body.textContent.trim();
+                }
+            });
+            
+            await browser.close();
+            
+            // Mettre à jour le statut du proxy à 'working'
+            await db.run('UPDATE credentials SET proxy_status = ? WHERE id = ?', ['working', credentialId]);
+            
+            res.json({
+                success: true,
+                detectedIp: ipInfo,
+                responseTime: responseTime,
+                proxyIp: credential.ip,
+                proxyPort: credential.port
+            });
+
+        } catch (error) {
+            await browser.close();
+            console.error('Erreur lors du test proxy:', error);
+            
+            // Mettre à jour le statut du proxy à 'failed'
+            await db.run('UPDATE credentials SET proxy_status = ? WHERE id = ?', ['failed', credentialId]);
+            
+            res.status(500).json({
+                success: false,
+                error: `Connexion proxy échouée: ${error.message}`
+            });
+        }
+
+    } catch (error) {
+        console.error('Erreur lors du test du proxy:', error);
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
@@ -653,8 +895,15 @@ app.post('/api/roi', async (req, res) => {
       });
     }
     
-    // Calculer le ROI avec les credentials récupérés
-    const result = await calculerROI(code, prix, credentials.login, credentials.password);
+    // Calculer le ROI avec les credentials récupérés et les informations proxy
+    const result = await calculerROI(
+      code, 
+      prix, 
+      credentials.login, 
+      credentials.password,
+      credentials.ip,
+      credentials.port
+    );
     
     if (result.success) {
       // Mettre à jour l'utilisation du credential
@@ -806,10 +1055,8 @@ app.listen(PORT, () => {
     cleanupPuppeteerTempFiles();
   }, 60 * 60 * 1000); // 1 heure
   
-  // Vérifier que les variables d'environnement sont définies
-  if (!process.env.SELLERAMP_EMAIL || !process.env.SELLERAMP_PASSWORD) {
-    console.warn('⚠️  ATTENTION: Les variables SELLERAMP_EMAIL et SELLERAMP_PASSWORD doivent être définies dans le fichier .env');
-  }
+  // Note: Le système utilise maintenant les credentials de la base de données
+  console.log('ℹ️  Le système utilise les credentials configurés dans la base de données');
 });
 
 // Nettoyage lors de la fermeture du serveur

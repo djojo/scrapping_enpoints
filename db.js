@@ -31,13 +31,32 @@ const db = new sqlite3.Database(path.join(__dirname, 'database.sqlite'), (err) =
             }
         });
 
+        // Créer la table proxy pour les informations d'authentification Webshare
+        db.run(`
+            CREATE TABLE IF NOT EXISTS proxy (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `, (err) => {
+            if (err) {
+                console.error('Erreur lors de la création de la table proxy:', err);
+            } else {
+                console.log('✅ Table proxy créée ou vérifiée');
+            }
+        });
+
         // Créer la table credentials si elle n'existe pas
         db.run(`
             CREATE TABLE IF NOT EXISTS credentials (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 login TEXT NOT NULL UNIQUE,
                 password TEXT NOT NULL,
+                ip TEXT DEFAULT NULL,
+                port INTEGER DEFAULT NULL,
                 status TEXT NOT NULL DEFAULT 'working' CHECK(status IN ('working', 'striked')),
+                proxy_status TEXT DEFAULT 'unknown' CHECK(proxy_status IN ('working', 'failed', 'unknown')),
                 countused INTEGER NOT NULL DEFAULT 0,
                 lastdateused TIMESTAMP DEFAULT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -47,6 +66,48 @@ const db = new sqlite3.Database(path.join(__dirname, 'database.sqlite'), (err) =
                 console.error('Erreur lors de la création de la table credentials:', err);
             } else {
                 console.log('✅ Table credentials créée ou vérifiée');
+                
+                // Vérifier si les colonnes ip, port et proxy_status existent déjà
+                db.all("PRAGMA table_info(credentials)", (err, columns) => {
+                    if (err) {
+                        console.error('Erreur lors de la vérification des colonnes:', err);
+                        return;
+                    }
+                    
+                    const hasIp = columns.some(col => col.name === 'ip');
+                    const hasPort = columns.some(col => col.name === 'port');
+                    const hasProxyStatus = columns.some(col => col.name === 'proxy_status');
+                    
+                    if (!hasIp) {
+                        db.run("ALTER TABLE credentials ADD COLUMN ip TEXT DEFAULT NULL", (err) => {
+                            if (err) {
+                                console.error('Erreur lors de l\'ajout de la colonne ip:', err);
+                            } else {
+                                console.log('✅ Colonne ip ajoutée à la table credentials');
+                            }
+                        });
+                    }
+                    
+                    if (!hasPort) {
+                        db.run("ALTER TABLE credentials ADD COLUMN port INTEGER DEFAULT NULL", (err) => {
+                            if (err) {
+                                console.error('Erreur lors de l\'ajout de la colonne port:', err);
+                            } else {
+                                console.log('✅ Colonne port ajoutée à la table credentials');
+                            }
+                        });
+                    }
+                    
+                    if (!hasProxyStatus) {
+                        db.run("ALTER TABLE credentials ADD COLUMN proxy_status TEXT DEFAULT 'unknown' CHECK(proxy_status IN ('working', 'failed', 'unknown'))", (err) => {
+                            if (err) {
+                                console.error('Erreur lors de l\'ajout de la colonne proxy_status:', err);
+                            } else {
+                                console.log('✅ Colonne proxy_status ajoutée à la table credentials');
+                            }
+                        });
+                    }
+                });
             }
         });
     }

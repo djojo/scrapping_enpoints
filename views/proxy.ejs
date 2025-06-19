@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Proxies Webshare</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .main-content {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .proxy-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .btn {
+            padding: 8px 16px;
+            margin: 2px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: black;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 500px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/navbar', { currentPage: 'proxy' }) %>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>🌐 Gestion des Proxies Webshare</h1>
+            <p>Gérez les informations d'authentification pour les proxies Webshare</p>
+        </div>
+
+        <div class="proxy-container">
+            <h2>Informations d'authentification Proxy</h2>
+            <button class="btn btn-success" onclick="openModal('add')">Ajouter des informations Proxy</button>
+            
+            <table id="proxyTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Password</th>
+                        <th>Date de création</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% proxies.forEach(proxy => { %>
+                    <tr>
+                        <td><%= proxy.username %></td>
+                        <td>***********</td>
+                        <td><%= new Date(proxy.created_at).toLocaleString('fr-FR') %></td>
+                        <td>
+                            <button class="btn btn-warning" onclick="editProxy(<%= proxy.id %>, '<%= proxy.username %>')">Éditer</button>
+                            <button class="btn btn-danger" onclick="deleteProxy(<%= proxy.id %>)">Supprimer</button>
+                        </td>
+                    </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Modal pour ajouter/éditer -->
+        <div id="proxyModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h3 id="modalTitle">Ajouter des informations Proxy</h3>
+                <form id="proxyForm">
+                    <input type="hidden" id="proxyId" name="id">
+                    <div class="form-group">
+                        <label for="username">Username Webshare:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password Webshare:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                    <button type="button" class="btn btn-danger" onclick="closeModal()">Annuler</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openModal(mode, id = null, username = '') {
+            const modal = document.getElementById('proxyModal');
+            const form = document.getElementById('proxyForm');
+            const title = document.getElementById('modalTitle');
+            
+            if (mode === 'add') {
+                title.textContent = 'Ajouter des informations Proxy';
+                form.reset();
+                document.getElementById('proxyId').value = '';
+            } else {
+                title.textContent = 'Éditer les informations Proxy';
+                document.getElementById('proxyId').value = id;
+                document.getElementById('username').value = username;
+                document.getElementById('password').value = '';
+                document.getElementById('password').placeholder = 'Laisser vide pour ne pas changer';
+                document.getElementById('password').required = false;
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('proxyModal').style.display = 'none';
+            document.getElementById('password').required = true;
+            document.getElementById('password').placeholder = '';
+        }
+
+        function editProxy(id, username) {
+            openModal('edit', id, username);
+        }
+
+        async function deleteProxy(id) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer ces informations proxy ?')) {
+                try {
+                    const response = await fetch(`/api/proxy/${id}`, {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        location.reload();
+                    } else {
+                        alert('Erreur lors de la suppression');
+                    }
+                } catch (error) {
+                    alert('Erreur de connexion');
+                }
+            }
+        }
+
+        document.getElementById('proxyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            
+            const isEdit = data.id !== '';
+            const url = isEdit ? `/api/proxy/${data.id}` : '/api/proxy';
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            // Si c'est une édition et que le mot de passe est vide, on ne l'envoie pas
+            if (isEdit && !data.password) {
+                delete data.password;
+            }
+            
+            try {
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    closeModal();
+                    location.reload();
+                } else {
+                    const error = await response.json();
+                    alert('Erreur: ' + error.error);
+                }
+            } catch (error) {
+                alert('Erreur de connexion');
+            }
+        });
+
+        // Fermer le modal en cliquant à l'extérieur
+        window.onclick = function(event) {
+            const modal = document.getElementById('proxyModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
+</body>
+</html> 
