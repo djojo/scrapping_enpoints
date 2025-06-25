@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keepa ROI Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .main-content {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #ff6b35;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result h3 {
+            margin-bottom: 1rem;
+        }
+
+        .product-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
+
+        .product-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .price-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #e1e5e9;
+            text-align: center;
+        }
+
+        .price-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .price-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .roi-section {
+            background: #e8f5e8;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+            border-left: 4px solid #28a745;
+        }
+
+        .roi-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .roi-negative {
+            color: #dc3545;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ff6b35;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .keepa-badge {
+            display: inline-block;
+            background: #ff6b35;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 0.5rem;
+        }
+
+        .sales-info {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.5rem 0;
+            padding: 0.5rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .sales-label {
+            color: #666;
+        }
+
+        .sales-value {
+            font-weight: bold;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <%- include('partials/navbar', { currentPage: 'keepa-roi' }) %>
+
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1>🔍 Keepa ROI Calculator</h1>
+                <p>Analysez la rentabilité de vos produits avec les données Keepa <span class="keepa-badge">KEEPA</span></p>
+            </div>
+
+            <div class="info">
+                <strong>ℹ️ Information :</strong> Ce calculateur utilise l'API Keepa pour obtenir des données de prix en temps réel et calculer le ROI précisément. Le prix saisi est HT et sera automatiquement converti en TTC.
+            </div>
+
+            <form id="keepaRoiForm">
+                <div class="form-group">
+                    <label for="ean">Code EAN (Code-barres européen) :</label>
+                    <input type="text" id="ean" name="ean" placeholder="Ex: 3760260453219" pattern="[0-9]{8,14}" required>
+                    <small style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.5rem;">
+                        Le code EAN doit contenir entre 8 et 14 chiffres
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="prixHT">Prix HT (€) :</label>
+                    <input type="number" id="prixHT" name="prixHT" step="0.01" min="0" placeholder="Ex: 25.99" required>
+                    <small style="color: #666; font-size: 0.9rem; display: block; margin-top: 0.5rem;">
+                        La TVA de 20% sera automatiquement ajoutée (Prix TTC = Prix HT × 1.20)
+                    </small>
+                </div>
+
+                <button type="submit" class="btn" id="submitBtn">
+                    🔍 Analyser avec Keepa
+                </button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyse en cours avec l'API Keepa... Cela peut prendre quelques secondes.</p>
+            </div>
+
+            <div class="result" id="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('keepaRoiForm');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const ean = document.getElementById('ean').value.trim();
+            const prixHT = parseFloat(document.getElementById('prixHT').value);
+
+            if (!ean || !prixHT || prixHT <= 0) {
+                showResult('error', `
+                    <h3>❌ Erreur de validation</h3>
+                    <p>Veuillez remplir tous les champs correctement.</p>
+                    <ul>
+                        <li>Le code EAN doit contenir entre 8 et 14 chiffres</li>
+                        <li>Le prix HT doit être un nombre positif</li>
+                    </ul>
+                `);
+                return;
+            }
+
+            // Validation du format EAN
+            if (!/^\d{8,14}$/.test(ean)) {
+                showResult('error', `
+                    <h3>❌ Format EAN invalide</h3>
+                    <p>Le code EAN doit contenir uniquement des chiffres (8 à 14 caractères).</p>
+                `);
+                return;
+            }
+
+            // Afficher le loading
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '🔍 Analyse en cours...';
+
+            try {
+                const response = await fetch('/api/keepa-roi', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ean, prixHT })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    const prixTTC = data.prixTTC.toFixed(2);
+                    const roi = data.roi;
+                    const product = data.product;
+                    const prix = data.prix;
+                    const ventes = data.ventes;
+
+                    let roiSection = '';
+                    if (roi && Object.keys(roi).length > 0) {
+                        const roiClass = roi.roiPourcentage > 0 ? 'roi-value' : 'roi-value roi-negative';
+                        const rentabiliteIcon = roi.rentable ? '✅' : '❌';
+                        const rentabiliteText = roi.rentable ? 'Rentable' : 'Non rentable';
+                        
+                        roiSection = `
+                            <div class="roi-section">
+                                <h4>${rentabiliteIcon} Analyse de rentabilité</h4>
+                                <div class="sales-info">
+                                    <span class="sales-label">ROI :</span>
+                                    <span class="${roiClass}">${roi.roiPourcentage.toFixed(2)}%</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Prix de vente :</span>
+                                    <span class="sales-value">${roi.prixVente?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Bénéfice brut :</span>
+                                    <span class="sales-value">${roi.beneficeBrut?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Frais Amazon :</span>
+                                    <span class="sales-value">${roi.fraisAmazon?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Frais FBA :</span>
+                                    <span class="sales-value">${roi.fraisFBA?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Bénéfice net :</span>
+                                    <span class="sales-value">${roi.beneficeNet?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Statut :</span>
+                                    <span class="sales-value">${rentabiliteText}</span>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        roiSection = `
+                            <div class="roi-section">
+                                <h4>⚠️ Calcul ROI impossible</h4>
+                                <p>Aucun prix de vente disponible actuellement sur Amazon pour ce produit.</p>
+                            </div>
+                        `;
+                    }
+
+                    showResult('success', `
+                        <h3>✅ Analyse Keepa réussie !</h3>
+                        
+                        <div class="product-info">
+                            <div class="product-title">${product.title}</div>
+                            <div><strong>ASIN :</strong> ${product.asin}</div>
+                            <div><strong>Marque :</strong> ${product.brand}</div>
+                            <div><strong>EAN :</strong> ${ean}</div>
+                        </div>
+
+                        <div class="price-section">
+                            <div class="price-card">
+                                <div class="price-label">Prix HT saisi</div>
+                                <div class="price-value">${data.prixHT.toFixed(2)}€</div>
+                            </div>
+                            <div class="price-card">
+                                <div class="price-label">Prix TTC (avec TVA)</div>
+                                <div class="price-value">${prixTTC}€</div>
+                            </div>
+                            <div class="price-card">
+                                <div class="price-label">Prix Amazon actuel</div>
+                                <div class="price-value">${prix.actuel?.toFixed(2) || 'N/A'}€</div>
+                            </div>
+                            <div class="price-card">
+                                <div class="price-label">Prix moyen 30j</div>
+                                <div class="price-value">${prix.moyen30j?.toFixed(2) || 'N/A'}€</div>
+                            </div>
+                        </div>
+
+                        ${roiSection}
+
+                        <div class="product-info">
+                            <h4>📊 Données de ventes</h4>
+                            <div class="sales-info">
+                                <span class="sales-label">Ventes mensuelles estimées :</span>
+                                <span class="sales-value">${ventes.mensuellesEstimees || 'N/A'}</span>
+                            </div>
+                            <div class="sales-info">
+                                <span class="sales-label">Drops rank 30j :</span>
+                                <span class="sales-value">${ventes.rankDrops30j || 'N/A'}</span>
+                            </div>
+                            <div class="sales-info">
+                                <span class="sales-label">Commission Amazon :</span>
+                                <span class="sales-value">${product.referralFeePercent}%</span>
+                            </div>
+                            <div class="sales-info">
+                                <span class="sales-label">Tokens Keepa restants :</span>
+                                <span class="sales-value">${data.tokensLeft || 'N/A'}</span>
+                            </div>
+                        </div>
+
+                        <div class="product-info">
+                            <h4>🔄 Variations de produit</h4>
+                            <div class="sales-info">
+                                <span class="sales-label">Nombre de variations :</span>
+                                <span class="sales-value">${data.variations?.nombreVariations || 0}</span>
+                            </div>
+                            ${data.variations?.parentAsin ? `
+                                <div class="sales-info">
+                                    <span class="sales-label">ASIN parent :</span>
+                                    <span class="sales-value">${data.variations.parentAsin}</span>
+                                </div>
+                            ` : ''}
+                            ${data.variations?.variationsDetails && data.variations.variationsDetails.length > 0 ? `
+                                <div style="margin-top: 1rem;">
+                                    <strong>Détails des variations :</strong>
+                                    ${data.variations.variationsDetails.map(variation => `
+                                        <div style="background: #f8f9fa; padding: 0.5rem; margin: 0.5rem 0; border-radius: 4px; border-left: 3px solid #ff6b35;">
+                                            <div><strong>ASIN:</strong> ${variation.asin}</div>
+                                            ${Object.keys(variation.attributes).length > 0 ? 
+                                                Object.keys(variation.attributes).map(attr => 
+                                                    `<div><strong>${attr}:</strong> ${variation.attributes[attr]}</div>`
+                                                ).join('')
+                                                : '<div><em>Aucun attribut spécifique</em></div>'
+                                            }
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `);
+                } else {
+                    showResult('error', `
+                        <h3>❌ Erreur</h3>
+                        <p>${data.error || 'Une erreur est survenue lors de l\'analyse'}</p>
+                        ${data.ean ? `<p><strong>EAN analysé :</strong> ${data.ean}</p>` : ''}
+                        ${data.prixHT ? `<p><strong>Prix HT saisi :</strong> ${data.prixHT}€</p>` : ''}
+                    `);
+                }
+            } catch (error) {
+                showResult('error', `
+                    <h3>❌ Erreur de connexion</h3>
+                    <p>Impossible de contacter l'API Keepa. Vérifiez que le serveur est démarré et que le token Keepa est configuré.</p>
+                    <p><strong>Détail :</strong> ${error.message}</p>
+                `);
+            } finally {
+                // Masquer le loading
+                loading.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.textContent = '🔍 Analyser avec Keepa';
+            }
+        });
+
+        function showResult(type, content) {
+            result.className = `result ${type}`;
+            result.innerHTML = content;
+            result.style.display = 'block';
+            result.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    </script>
+</body>
+</html> 

@@ -3,6 +3,7 @@ const path = require('path');
 const puppeteer = require('puppeteer');
 const session = require('express-session');
 const db = require('./db');
+const fetch = require('node-fetch');
 require('dotenv').config();
 
 const app = express();
@@ -103,6 +104,151 @@ async function taperHumain(page, selector, texte) {
   for (let char of texte) {
     await page.keyboard.type(char);
     await delaiHumain(50, 200); // Délai entre chaque caractère
+  }
+}
+
+// Fonction pour calculer le ROI via l'API Keepa
+async function calculROIKEEPA(ean, prixHT) {
+  console.log(`Calcul du ROI Keepa pour l'EAN: ${ean} avec le prix HT: ${prixHT}`);
+  
+  try {
+    // Vérifier que le token Keepa est configuré
+    const tokenKeepa = process.env.TOKEN_KEEPA;
+    if (!tokenKeepa) {
+      throw new Error('TOKEN_KEEPA non configuré dans les variables d\'environnement');
+    }
+
+    // Convertir le prix HT en TTC (TVA 20%)
+    const prixTTC = prixHT * 1.20;
+    console.log(`Prix TTC calculé: ${prixTTC.toFixed(2)}€`);
+
+    // Construction de l'URL pour l'API Keepa
+    const url = new URL('https://api.keepa.com/product');
+    url.searchParams.append('key', tokenKeepa);
+    url.searchParams.append('domain', '4'); // France
+    url.searchParams.append('code', ean);
+    url.searchParams.append('stats', '7');
+    url.searchParams.append('rating', '0');
+
+    console.log(`Appel API Keepa: ${url.toString()}`);
+
+    // Appel à l'API Keepa
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'ROI Calculator/1.0'
+      },
+      timeout: 30000 // 30 secondes
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur API Keepa: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Vérifier si des produits ont été trouvés
+    if (!data.products || data.products.length === 0) {
+      return {
+        success: false,
+        error: 'Aucun produit trouvé pour cet EAN',
+        ean: ean,
+        prixHT: prixHT,
+        prixTTC: prixTTC
+      };
+    }
+
+    const product = data.products[0];
+    
+    // Extraction des données importantes du produit
+    const productData = {
+      asin: product.asin,
+      title: product.title || 'Titre non disponible',
+      brand: product.brand || 'Marque non disponible',
+      categoryTree: product.categoryTree || [],
+      salesRank: product.salesRanks ? Object.values(product.salesRanks)[0] : null,
+      referralFeePercent: product.referralFeePercent || product.referralFeePercentage || 15
+    };
+
+    // Extraction des données de prix et stock
+    const stats = product.stats || {};
+    const current = stats.current || [];
+    
+    // Récupérer le prix Amazon actuel (buyBoxPrice)
+    let prixAmazonActuel = null;
+    if (stats.buyBoxPrice && stats.buyBoxPrice > 0) {
+      prixAmazonActuel = stats.buyBoxPrice / 100; // Convertir de centimes en euros
+    } else if (current.length >= 2 && current[1] > 0) {
+      prixAmazonActuel = current[1] / 100; // Prix dans le tableau current
+    }
+
+    // Calcul des moyennes de prix sur différentes périodes
+    const avg30 = stats.avg30 ? stats.avg30.map(price => price > 0 ? price / 100 : null).filter(p => p !== null) : [];
+    const avg90 = stats.avg90 ? stats.avg90.map(price => price > 0 ? price / 100 : null).filter(p => p !== null) : [];
+    const avg180 = stats.avg180 ? stats.avg180.map(price => price > 0 ? price / 100 : null).filter(p => p !== null) : [];
+
+    const prixMoyen30j = avg30.length > 0 ? avg30.reduce((a, b) => a + b, 0) / avg30.length : null;
+    const prixMoyen90j = avg90.length > 0 ? avg90.reduce((a, b) => a + b, 0) / avg90.length : null;
+    const prixMoyen180j = avg180.length > 0 ? avg180.reduce((a, b) => a + b, 0) / avg180.length : null;
+
+    // Calcul des ventes estimées
+    const monthlySold = stats.monthlySold || 0;
+    const salesRankDrops30 = stats.salesRankDrops30 || 0;
+    const salesRankDrops90 = stats.salesRankDrops90 || 0;
+
+    // Calcul du ROI
+    let roiCalculations = {};
+    
+    if (prixAmazonActuel && prixAmazonActuel > prixTTC) {
+      const beneficeBrut = prixAmazonActuel - prixTTC;
+      const fraisAmazon = prixAmazonActuel * (productData.referralFeePercent / 100);
+      const fraisFBA = 3; // Estimation des frais FBA (à ajuster selon le produit)
+      const beneficeNet = beneficeBrut - fraisAmazon - fraisFBA;
+      const roiPourcentage = (beneficeNet / prixTTC) * 100;
+
+      roiCalculations = {
+        prixVente: prixAmazonActuel,
+        prixAchat: prixTTC,
+        beneficeBrut: beneficeBrut,
+        fraisAmazon: fraisAmazon,
+        fraisFBA: fraisFBA,
+        beneficeNet: beneficeNet,
+        roiPourcentage: roiPourcentage,
+        rentable: roiPourcentage > 15 // Seuil de rentabilité à 15%
+      };
+    }
+
+    return {
+      success: true,
+      ean: ean,
+      prixHT: prixHT,
+      prixTTC: prixTTC,
+      product: productData,
+      prix: {
+        actuel: prixAmazonActuel,
+        moyen30j: prixMoyen30j,
+        moyen90j: prixMoyen90j,
+        moyen180j: prixMoyen180j
+      },
+      ventes: {
+        mensuellesEstimees: monthlySold,
+        rankDrops30j: salesRankDrops30,
+        rankDrops90j: salesRankDrops90
+      },
+      roi: roiCalculations,
+      tokensLeft: data.tokensLeft || 0,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('Erreur lors du calcul ROI Keepa:', error);
+    return {
+      success: false,
+      error: error.message,
+      ean: ean,
+      prixHT: prixHT,
+      prixTTC: prixHT * 1.20
+    };
   }
 }
 
@@ -923,6 +1069,71 @@ app.post('/api/roi', async (req, res) => {
   }
 });
 
+// Nouvelle route API pour calculer le ROI via Keepa
+app.post('/api/keepa-roi', async (req, res) => {
+  try {
+    const { ean, prixHT } = req.body;
+    
+    // Validation des paramètres
+    if (!ean || !prixHT) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le code EAN et le prix HT sont requis'
+      });
+    }
+
+    // Validation du format EAN
+    if (!/^\d{8,14}$/.test(ean)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le code EAN doit être composé de 8 à 14 chiffres'
+      });
+    }
+
+    // Validation du prix
+    const prix = parseFloat(prixHT);
+    if (isNaN(prix) || prix <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le prix HT doit être un nombre positif'
+      });
+    }
+
+    console.log(`🔍 Nouvelle demande ROI Keepa - EAN: ${ean}, Prix HT: ${prix}€`);
+
+    // Appel de la fonction de calcul ROI Keepa
+    const result = await calculROIKEEPA(ean, prix);
+
+    // Incrémenter le compteur si le calcul est réussi
+    if (result.success) {
+      try {
+        await db.run(
+          'UPDATE counter SET counter = counter + 1, date = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM counter ORDER BY id DESC LIMIT 1)'
+        );
+      } catch (counterError) {
+        console.error('Erreur lors de l\'incrémentation du compteur:', counterError);
+        // Ne pas faire échouer la requête pour une erreur de compteur
+      }
+    }
+
+    // Retourner le résultat
+    if (result.success) {
+      console.log(`✅ ROI Keepa calculé avec succès pour ${ean}`);
+      res.json(result);
+    } else {
+      console.log(`❌ Échec du calcul ROI Keepa pour ${ean}: ${result.error}`);
+      res.status(400).json(result);
+    }
+
+  } catch (error) {
+    console.error('Erreur lors du calcul du ROI Keepa:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur serveur lors du calcul du ROI'
+    });
+  }
+});
+
 // Routes d'authentification
 app.get('/login', (req, res) => {
     res.render('login', { error: null });
@@ -962,6 +1173,11 @@ app.get('/', (req, res) => {
 // Route pour la page de calcul ROI
 app.get('/roi', (req, res) => {
     res.render('roi');
+});
+
+// Route pour la page de calcul ROI Keepa
+app.get('/keepa-roi', (req, res) => {
+    res.render('keepa-roi');
 });
 
 // Route pour afficher le compteur
@@ -1038,12 +1254,251 @@ app.post('/api/counter/reset', async (req, res) => {
     }
 });
 
+// Fonction pour calculer le ROI via l'API Keepa
+async function calculROIKEEPA(ean, prixHT) {
+  console.log(`Calcul du ROI Keepa pour l'EAN: ${ean} avec le prix HT: ${prixHT}`);
+  
+  try {
+    // Vérifier que le token Keepa est configuré
+    const tokenKeepa = process.env.TOKEN_KEEPA;
+    if (!tokenKeepa) {
+      throw new Error('TOKEN_KEEPA non configuré dans les variables d\'environnement');
+    }
+
+    // Convertir le prix HT en TTC (TVA 20%)
+    const prixTTC = prixHT * 1.20;
+    console.log(`Prix TTC calculé: ${prixTTC.toFixed(2)}€`);
+
+    // Construction de l'URL pour l'API Keepa
+    const url = new URL('https://api.keepa.com/product');
+    url.searchParams.append('key', tokenKeepa);
+    url.searchParams.append('domain', '4'); // France
+    url.searchParams.append('code', ean);
+    url.searchParams.append('stats', '7');
+    url.searchParams.append('rating', '0');
+
+    console.log(`Appel API Keepa: ${url.toString()}`);
+
+    // Appel à l'API Keepa
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'ROI Calculator/1.0'
+      },
+      timeout: 30000 // 30 secondes
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erreur API Keepa: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    
+    // Vérifier si des produits ont été trouvés
+    if (!data.products || data.products.length === 0) {
+      return {
+        success: false,
+        error: 'Aucun produit trouvé pour cet EAN',
+        ean: ean,
+        prixHT: prixHT,
+        prixTTC: prixTTC
+      };
+    }
+
+    const product = data.products[0];
+    
+    // Extraction des données importantes du produit
+    const productData = {
+      asin: product.asin,
+      title: product.title || 'Titre non disponible',
+      brand: product.brand || 'Marque non disponible',
+      categoryTree: product.categoryTree || [],
+      salesRank: product.salesRanks ? Object.values(product.salesRanks)[0] : null,
+      referralFeePercent: product.referralFeePercent || product.referralFeePercentage || 15
+    };
+
+    // Extraction des données de variations
+    const variationsData = {
+      nombreVariations: 0,
+      variationCSV: product.variationCSV || null,
+      variations: product.variations || [],
+      parentAsin: product.parentAsin || null
+    };
+
+    // Calculer le nombre de variations
+    if (product.variations && product.variations.length > 0) {
+      variationsData.nombreVariations = product.variations.length;
+    } else if (product.variationCSV) {
+      // Si pas de détails mais qu'il y a un CSV, compter les ASIN
+      variationsData.nombreVariations = product.variationCSV.split(',').filter(asin => asin.trim()).length;
+    }
+
+    // Ajouter des informations détaillées sur les variations
+    if (product.variations && product.variations.length > 0) {
+      variationsData.variationsDetails = product.variations.map(variation => ({
+        asin: variation.asin,
+        attributes: variation.attributes ? variation.attributes.reduce((acc, attr) => {
+          acc[attr.dimension] = attr.value;
+          return acc;
+        }, {}) : {}
+      }));
+    }
+
+    // Extraction des données de prix et stock
+    const stats = product.stats || {};
+    const current = stats.current || [];
+    
+    // Récupérer le prix Amazon actuel (buyBoxPrice)
+    let prixAmazonActuel = null;
+    if (stats.buyBoxPrice && stats.buyBoxPrice > 0) {
+      prixAmazonActuel = stats.buyBoxPrice / 100; // Convertir de centimes en euros
+    } else if (current.length >= 2 && current[1] > 0) {
+      prixAmazonActuel = current[1] / 100; // Prix dans le tableau current
+    }
+
+    // Calcul des moyennes de prix sur différentes périodes
+    const avg30 = stats.avg30 ? stats.avg30.map(price => price > 0 ? price / 100 : null).filter(p => p !== null) : [];
+    const avg90 = stats.avg90 ? stats.avg90.map(price => price > 0 ? price / 100 : null).filter(p => p !== null) : [];
+    const avg180 = stats.avg180 ? stats.avg180.map(price => price > 0 ? price / 100 : null).filter(p => p !== null) : [];
+
+    const prixMoyen30j = avg30.length > 0 ? avg30.reduce((a, b) => a + b, 0) / avg30.length : null;
+    const prixMoyen90j = avg90.length > 0 ? avg90.reduce((a, b) => a + b, 0) / avg90.length : null;
+    const prixMoyen180j = avg180.length > 0 ? avg180.reduce((a, b) => a + b, 0) / avg180.length : null;
+
+    // Calcul des ventes estimées
+    const monthlySold = stats.monthlySold || 0;
+    const salesRankDrops30 = stats.salesRankDrops30 || 0;
+    const salesRankDrops90 = stats.salesRankDrops90 || 0;
+
+    // Calcul du ROI
+    let roiCalculations = {};
+    
+    if (prixAmazonActuel && prixAmazonActuel > prixTTC) {
+      const beneficeBrut = prixAmazonActuel - prixTTC;
+      const fraisAmazon = prixAmazonActuel * (productData.referralFeePercent / 100);
+      const fraisFBA = 3; // Estimation des frais FBA (à ajuster selon le produit)
+      const beneficeNet = beneficeBrut - fraisAmazon - fraisFBA;
+      const roiPourcentage = (beneficeNet / prixTTC) * 100;
+
+      roiCalculations = {
+        prixVente: prixAmazonActuel,
+        prixAchat: prixTTC,
+        beneficeBrut: beneficeBrut,
+        fraisAmazon: fraisAmazon,
+        fraisFBA: fraisFBA,
+        beneficeNet: beneficeNet,
+        roiPourcentage: roiPourcentage,
+        rentable: roiPourcentage > 15 // Seuil de rentabilité à 15%
+      };
+    }
+
+    return {
+      success: true,
+      ean: ean,
+      prixHT: prixHT,
+      prixTTC: prixTTC,
+      product: productData,
+      prix: {
+        actuel: prixAmazonActuel,
+        moyen30j: prixMoyen30j,
+        moyen90j: prixMoyen90j,
+        moyen180j: prixMoyen180j
+      },
+      ventes: {
+        mensuellesEstimees: monthlySold,
+        rankDrops30j: salesRankDrops30,
+        rankDrops90j: salesRankDrops90
+      },
+      roi: roiCalculations,
+      variations: variationsData,
+      tokensLeft: data.tokensLeft || 0,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('Erreur lors du calcul ROI Keepa:', error);
+    return {
+      success: false,
+      error: error.message,
+      ean: ean,
+      prixHT: prixHT,
+      prixTTC: prixHT * 1.20
+    };
+  }
+}
+
+// Nouvelle route API pour calculer le ROI via Keepa
+app.post('/api/keepa-roi', async (req, res) => {
+  try {
+    const { ean, prixHT } = req.body;
+    
+    // Validation des paramètres
+    if (!ean || !prixHT) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le code EAN et le prix HT sont requis'
+      });
+    }
+
+    // Validation du format EAN
+    if (!/^\d{8,14}$/.test(ean)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le code EAN doit être composé de 8 à 14 chiffres'
+      });
+    }
+
+    // Validation du prix
+    const prix = parseFloat(prixHT);
+    if (isNaN(prix) || prix <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Le prix HT doit être un nombre positif'
+      });
+    }
+
+    console.log(`🔍 Nouvelle demande ROI Keepa - EAN: ${ean}, Prix HT: ${prix}€`);
+
+    // Appel de la fonction de calcul ROI Keepa
+    const result = await calculROIKEEPA(ean, prix);
+
+    // Incrémenter le compteur si le calcul est réussi
+    if (result.success) {
+      try {
+        await db.run(
+          'UPDATE counter SET counter = counter + 1, date = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM counter ORDER BY id DESC LIMIT 1)'
+        );
+      } catch (counterError) {
+        console.error('Erreur lors de l\'incrémentation du compteur:', counterError);
+        // Ne pas faire échouer la requête pour une erreur de compteur
+      }
+    }
+
+    // Retourner le résultat
+    if (result.success) {
+      console.log(`✅ ROI Keepa calculé avec succès pour ${ean}`);
+      res.json(result);
+    } else {
+      console.log(`❌ Échec du calcul ROI Keepa pour ${ean}: ${result.error}`);
+      res.status(400).json(result);
+    }
+
+  } catch (error) {
+    console.error('Erreur lors du calcul du ROI Keepa:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur serveur lors du calcul du ROI'
+    });
+  }
+});
+
 // Démarrer le serveur
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur le port ${PORT}`);
   console.log(`🌐 Interface web: http://localhost:${PORT}`);
   console.log(`💚 Health check: http://localhost:${PORT}/api/health`);
   console.log(`📊 Endpoint ROI: POST http://localhost:${PORT}/api/roi`);
+  console.log(`🔍 Endpoint Keepa ROI: POST http://localhost:${PORT}/api/keepa-roi`);
   
   // Nettoyage initial des fichiers temporaires Puppeteer
   console.log('🧹 Nettoyage des fichiers temporaires Puppeteer...');
