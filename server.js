@@ -1388,16 +1388,18 @@ async function processKeepaProduct(data, ean, prixHT, prixTTC, domain) {
   const prixMoyen90j = avg90.length > 0 ? avg90.reduce((a, b) => a + b, 0) / avg90.length : null;
   const prixMoyen180j = avg180.length > 0 ? avg180.reduce((a, b) => a + b, 0) / avg180.length : null;
 
-  // Calcul des ventes estimées
-  const monthlySold = stats.monthlySold || 0;
-  const salesRankDrops30 = stats.salesRankDrops30 || 0;
-  const salesRankDrops90 = stats.salesRankDrops90 || 0;
+  // Calcul des ventes estimées - UTILISER LES SALES RANK DROPS (vraies données)
+  const salesRankDrops30 = stats.salesRankDrops30 || 0;   // Ventes estimées 30 jours
+  const salesRankDrops90 = stats.salesRankDrops90 || 0;   // Ventes estimées 90 jours
+  const salesRankDrops180 = stats.salesRankDrops180 || 0; // Ventes estimées 180 jours
+  const salesRankDrops365 = stats.salesRankDrops365 || 0; // Ventes estimées 365 jours
   
-  // Debug temporaire pour voir les données brutes de ventes
-  console.log('📊 Données de ventes brutes Keepa:', {
-    monthlySold: stats.monthlySold,
-    salesRankDrops30: stats.salesRankDrops30,
-    salesRankDrops90: stats.salesRankDrops90,
+  // Debug pour voir les vraies données de ventes (Sales Rank Drops)
+  console.log('📊 Sales Rank Drops - Vraies données de ventes Keepa:', {
+    ventes30jours: salesRankDrops30,
+    ventes90jours: salesRankDrops90,
+    ventes180jours: salesRankDrops180,
+    ventes365jours: salesRankDrops365,
     salesRank: productData.salesRank,
     availableStats: Object.keys(stats)
   });
@@ -1437,9 +1439,11 @@ async function processKeepaProduct(data, ean, prixHT, prixTTC, domain) {
         moyen180j: prixMoyen180j
       },
       ventes: {
-        mensuellesEstimees: monthlySold,
-        rankDrops30j: salesRankDrops30,
-        rankDrops90j: salesRankDrops90
+        mensuellesEstimees: salesRankDrops30,        // ✅ Utiliser Sales Rank Drops 30j (vraies ventes)
+        rankDrops30j: salesRankDrops30,             // ✅ Ventes 30 jours  
+        rankDrops90j: salesRankDrops90,             // ✅ Ventes 90 jours
+        rankDrops180j: salesRankDrops180,           // ✅ Ventes 180 jours  
+        rankDrops365j: salesRankDrops365            // ✅ Ventes 365 jours
       },
       roi: roiCalculations,
       variations: variationsData,
