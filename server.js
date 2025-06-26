@@ -925,6 +925,142 @@ app.post('/api/roi', async (req, res) => {
   }
 });
 
+// Route de démonstration pour montrer les calculs de frais FBA/Port
+app.get('/api/keepa-roi/demo', (req, res) => {
+  // Simulation d'un produit avec des données complètes pour démonstration
+  const produitDemo = {
+    asin: "B07DEMO123",
+    title: "Parfum Exemple - Démonstration des frais FBA",
+    brand: "Demo Brand",
+    packageDimensions: {
+      length: 15,
+      width: 10, 
+      height: 12
+    },
+    packageWeight: 250, // 250 grammes
+    referralFeePercent: 15
+  };
+  
+  const prixVenteDemo = 48.99;  // Prix de vente pour avoir un exemple rentable (> 15%)
+  const prixAchatDemo = 25.00;
+  const prixTTCDemo = prixAchatDemo * 1.20; // 30.60€
+  
+  // Calcul des frais avec la nouvelle fonction
+  const fraisData = calculerFraisFBAEtPort(produitDemo, prixVenteDemo);
+  
+  // Calcul du ROI selon la nouvelle méthode (HT/TTC séparés)
+  const prixVenteTTC = prixVenteDemo;
+  const prixVenteHT = prixVenteTTC / 1.2;
+  
+  // Frais Amazon calculés sur le TTC puis convertis en HT
+  const fraisAmazonTTC = prixVenteTTC * (produitDemo.referralFeePercent / 100);
+  const fraisAmazonHT = fraisAmazonTTC / 1.2;
+  
+  // Frais FBA et port en TTC, conversion en HT
+  const fraisFBATTC = fraisData.fraisFBA;
+  const fraisFBAHT = fraisFBATTC / 1.2;
+  const fraisPortTTC = fraisData.fraisPort;
+  const fraisPortHT = fraisPortTTC / 1.2;
+  
+  // Calcul du bénéfice net HT
+  const beneficeNetHT = prixVenteHT - prixAchatDemo - fraisAmazonHT - fraisFBAHT - fraisPortHT;
+  const roiPourcentageHT = (beneficeNetHT / prixAchatDemo) * 100;
+  
+  const demoResponse = {
+    success: true,
+    message: "🧪 Données de démonstration - Calcul des frais FBA et de port",
+    ean: "DEMO-EAN-123456789",
+    prixHT: prixAchatDemo,
+    prixTTC: prixTTCDemo,
+    product: {
+      asin: produitDemo.asin,
+      title: produitDemo.title,
+      brand: produitDemo.brand,
+      referralFeePercent: produitDemo.referralFeePercent,
+      domain: "France (amazon.fr) - DEMO",
+      domainCode: "4"
+    },
+    prix: {
+      actuel: prixVenteDemo,
+      moyen30j: 33.50,
+      moyen90j: 34.20,
+      moyen180j: 36.10
+    },
+    ventes: {
+      mensuellesEstimees: 45,
+      rankDrops30j: 45,
+      rankDrops90j: 120,
+      rankDrops180j: 230,
+      rankDrops365j: 580
+    },
+    roi: {
+      // Prix en TTC
+      prixVenteTTC: prixVenteTTC,
+      prixAchatTTC: prixTTCDemo,
+      
+      // Prix en HT
+      prixVenteHT: prixVenteHT,
+      prixAchatHT: prixAchatDemo,
+      
+      // Frais en TTC
+      fraisTTC: {
+        amazon: fraisAmazonTTC,
+        fba: fraisFBATTC,
+        port: fraisPortTTC,
+        total: fraisAmazonTTC + fraisFBATTC + fraisPortTTC
+      },
+      
+      // Frais en HT
+      fraisHT: {
+        amazon: fraisAmazonHT,
+        fba: fraisFBAHT,
+        port: fraisPortHT,
+        total: fraisAmazonHT + fraisFBAHT + fraisPortHT
+      },
+      
+      fraisDetails: fraisData.details,
+      beneficeNetHT: beneficeNetHT,
+      roiPourcentageHT: roiPourcentageHT,
+      rentable: roiPourcentageHT > 15,
+      
+      // Détail du calcul pour transparence
+      calculDetail: {
+        prixVenteHT: `${prixVenteTTC.toFixed(2)}€ TTC ÷ 1.2 = ${prixVenteHT.toFixed(2)}€ HT`,
+        fraisAmazonHT: `${fraisAmazonTTC.toFixed(2)}€ TTC ÷ 1.2 = ${fraisAmazonHT.toFixed(2)}€ HT`,
+        fraisFBAHT: `${fraisFBATTC.toFixed(2)}€ TTC ÷ 1.2 = ${fraisFBAHT.toFixed(2)}€ HT`,
+        fraisPortHT: `${fraisPortTTC.toFixed(2)}€ TTC ÷ 1.2 = ${fraisPortHT.toFixed(2)}€ HT`,
+        beneficeCalcul: `${prixVenteHT.toFixed(2)} - ${prixAchatDemo.toFixed(2)} - ${fraisAmazonHT.toFixed(2)} - ${fraisFBAHT.toFixed(2)} - ${fraisPortHT.toFixed(2)} = ${beneficeNetHT.toFixed(2)}€ HT`,
+        roiCalcul: `(${beneficeNetHT.toFixed(2)} ÷ ${prixAchatDemo.toFixed(2)}) × 100 = ${roiPourcentageHT.toFixed(2)}%`
+      }
+    },
+    variations: {
+      nombreVariations: 3,
+      variationCSV: "B07DEMO123,B07DEMO124,B07DEMO125",
+      variations: [
+        {
+          asin: "B07DEMO124",
+          attributes: {
+            "ScentName": "Vanille",
+            "Size": "50ml"
+          }
+        },
+        {
+          asin: "B07DEMO125", 
+          attributes: {
+            "ScentName": "Rose",
+            "Size": "100ml"
+          }
+        }
+      ],
+      parentAsin: "B07DEMO123"
+    },
+    tokensLeft: 1190,
+    timestamp: new Date().toISOString()
+  };
+  
+  res.json(demoResponse);
+});
+
 // Nouvelle route API pour calculer le ROI via Keepa
 app.post('/api/keepa-roi', async (req, res) => {
   try {
@@ -1324,6 +1460,97 @@ async function calculROIKEEPA(ean, prixHT) {
   }
 }
 
+// Fonction pour calculer les frais FBA et de port réels
+function calculerFraisFBAEtPort(product, prixVente) {
+  // Extraire les dimensions et poids du produit (si disponibles)
+  const dimensions = product.packageDimensions || {};
+  const poids = product.packageWeight || product.itemWeight || 0;
+  
+  // Dimensions en cm et poids en kg
+  const longueur = dimensions.length || 0;
+  const largeur = dimensions.width || 0; 
+  const hauteur = dimensions.height || 0;
+  const poidsKg = poids / 1000; // Convertir grammes en kg
+  
+  // Calcul du volume en cm³
+  const volume = longueur * largeur * hauteur;
+  
+  // Grille des frais FBA Amazon France 2024 (en euros)
+  let fraisFBA = 0;
+  let fraisPort = 0;
+  let categorieTaille = 'Standard';
+  let details = {};
+  
+  // Déterminer la catégorie de taille selon les critères Amazon
+  if (longueur <= 23 && largeur <= 17.5 && hauteur <= 3 && poidsKg <= 0.46) {
+    // Petit format standard
+    categorieTaille = 'Petit format standard';
+    fraisFBA = 2.30;
+    fraisPort = 1.50;
+  } else if (longueur <= 35 && largeur <= 25 && hauteur <= 12 && poidsKg <= 2) {
+    // Grand format standard  
+    categorieTaille = 'Grand format standard';
+    fraisFBA = 3.10;
+    fraisPort = 2.20;
+  } else if (longueur <= 45 && largeur <= 35 && hauteur <= 20 && poidsKg <= 10) {
+    // Petit format volumineux
+    categorieTaille = 'Petit format volumineux';
+    fraisFBA = 4.50;
+    fraisPort = 3.50;
+  } else if (longueur <= 61 && largeur <= 46 && hauteur <= 46 && poidsKg <= 20) {
+    // Grand format volumineux
+    categorieTaille = 'Grand format volumineux';
+    fraisFBA = 6.20;
+    fraisPort = 4.80;
+  } else {
+    // Très grand format ou très lourd
+    categorieTaille = 'Format spécial/volumineux';
+    fraisFBA = Math.max(8.50, poidsKg * 0.85); // Minimum 8.50€ ou 0.85€/kg
+    fraisPort = Math.max(6.00, poidsKg * 0.45); // Minimum 6€ ou 0.45€/kg
+  }
+  
+  // Si pas de données de dimensions, estimation basée sur le prix
+  if (volume === 0 && prixVente) {
+    if (prixVente < 15) {
+      categorieTaille = 'Petit format (estimé)';
+      fraisFBA = 2.50;
+      fraisPort = 1.80;
+    } else if (prixVente < 50) {
+      categorieTaille = 'Format moyen (estimé)';
+      fraisFBA = 3.50;
+      fraisPort = 2.50;
+    } else {
+      categorieTaille = 'Grand format (estimé)';
+      fraisFBA = 5.00;
+      fraisPort = 3.50;
+    }
+  }
+  
+  // Ajouter les frais de stockage mensuels (estimation)
+  const fraisStockage = Math.min(prixVente * 0.01, 2.00); // Max 2€/mois
+  fraisFBA += fraisStockage;
+  
+  details = {
+    categorieTaille: categorieTaille,
+    dimensions: {
+      longueur: longueur,
+      largeur: largeur,
+      hauteur: hauteur,
+      volume: volume
+    },
+    poids: poidsKg,
+    fraisBase: fraisFBA - fraisStockage,
+    fraisStockage: fraisStockage,
+    estimation: volume === 0 ? 'Basée sur le prix (pas de dimensions)' : 'Basée sur les dimensions réelles'
+  };
+  
+  return {
+    fraisFBA: Number(fraisFBA.toFixed(2)),
+    fraisPort: Number(fraisPort.toFixed(2)),
+    details: details
+  };
+}
+
 // Fonction pour traiter les données Keepa une fois qu'un produit est trouvé
 async function processKeepaProduct(data, ean, prixHT, prixTTC, domain) {
   const product = data.products[0];
@@ -1404,25 +1631,77 @@ async function processKeepaProduct(data, ean, prixHT, prixTTC, domain) {
     availableStats: Object.keys(stats)
   });
 
-  // Calcul du ROI
+  // Calcul des frais FBA et de port selon les données Amazon réelles
+  const fraisData = calculerFraisFBAEtPort(product, prixAmazonActuel);
+  
+  // Calcul du ROI selon la méthode spécifiée (HT/TTC séparés)
   let roiCalculations = {};
   
   if (prixAmazonActuel && prixAmazonActuel > prixTTC) {
-    const beneficeBrut = prixAmazonActuel - prixTTC;
-    const fraisAmazon = prixAmazonActuel * (productData.referralFeePercent / 100);
-    const fraisFBA = 3; // Estimation des frais FBA (à ajuster selon le produit)
-    const beneficeNet = beneficeBrut - fraisAmazon - fraisFBA;
-    const roiPourcentage = (beneficeNet / prixTTC) * 100;
+    // Prix Amazon Keepa est en TTC
+    const prixVenteTTC = prixAmazonActuel;
+    
+    // Conversion du prix de vente en HT
+    const prixVenteHT = prixVenteTTC / 1.2;
+    
+    // Frais Amazon calculés sur le TTC puis convertis en HT
+    const fraisAmazonTTC = prixVenteTTC * (productData.referralFeePercent / 100);
+    const fraisAmazonHT = fraisAmazonTTC / 1.2;
+    
+    // Frais FBA sont en TTC, conversion en HT
+    const fraisFBATTC = fraisData.fraisFBA;
+    const fraisFBAHT = fraisFBATTC / 1.2;
+    
+    // Frais de port sont en TTC, conversion en HT  
+    const fraisPortTTC = fraisData.fraisPort;
+    const fraisPortHT = fraisPortTTC / 1.2;
+    
+    // Calcul du bénéfice net HT
+    // Bénéfice net HT = Prix vente HT - Prix achat HT - Frais Amazon HT - Frais FBA HT - Frais port HT
+    const beneficeNetHT = prixVenteHT - prixHT - fraisAmazonHT - fraisFBAHT - fraisPortHT;
+    
+    // ROI net HT = (Bénéfice net HT / Prix achat HT) × 100
+    const roiPourcentageHT = (beneficeNetHT / prixHT) * 100;
 
     roiCalculations = {
-      prixVente: prixAmazonActuel,
-      prixAchat: prixTTC,
-      beneficeBrut: beneficeBrut,
-      fraisAmazon: fraisAmazon,
-      fraisFBA: fraisFBA,
-      beneficeNet: beneficeNet,
-      roiPourcentage: roiPourcentage,
-      rentable: roiPourcentage > 15 // Seuil de rentabilité à 15%
+      // Prix en TTC
+      prixVenteTTC: prixVenteTTC,
+      prixAchatTTC: prixTTC,
+      
+      // Prix en HT
+      prixVenteHT: prixVenteHT,
+      prixAchatHT: prixHT,
+      
+      // Frais en TTC
+      fraisTTC: {
+        amazon: fraisAmazonTTC,
+        fba: fraisFBATTC,
+        port: fraisPortTTC,
+        total: fraisAmazonTTC + fraisFBATTC + fraisPortTTC
+      },
+      
+      // Frais en HT
+      fraisHT: {
+        amazon: fraisAmazonHT,
+        fba: fraisFBAHT,
+        port: fraisPortHT,
+        total: fraisAmazonHT + fraisFBAHT + fraisPortHT
+      },
+      
+      fraisDetails: fraisData.details,
+      beneficeNetHT: beneficeNetHT,
+      roiPourcentageHT: roiPourcentageHT,
+      rentable: roiPourcentageHT > 15, // Seuil de rentabilité à 15%
+      
+      // Détail du calcul pour transparence
+      calculDetail: {
+        prixVenteHT: `${prixVenteTTC.toFixed(2)}€ TTC ÷ 1.2 = ${prixVenteHT.toFixed(2)}€ HT`,
+        fraisAmazonHT: `${fraisAmazonTTC.toFixed(2)}€ TTC ÷ 1.2 = ${fraisAmazonHT.toFixed(2)}€ HT`,
+        fraisFBAHT: `${fraisFBATTC.toFixed(2)}€ TTC ÷ 1.2 = ${fraisFBAHT.toFixed(2)}€ HT`,
+        fraisPortHT: `${fraisPortTTC.toFixed(2)}€ TTC ÷ 1.2 = ${fraisPortHT.toFixed(2)}€ HT`,
+        beneficeCalcul: `${prixVenteHT.toFixed(2)} - ${prixHT.toFixed(2)} - ${fraisAmazonHT.toFixed(2)} - ${fraisFBAHT.toFixed(2)} - ${fraisPortHT.toFixed(2)} = ${beneficeNetHT.toFixed(2)}€ HT`,
+        roiCalcul: `(${beneficeNetHT.toFixed(2)} ÷ ${prixHT.toFixed(2)}) × 100 = ${roiPourcentageHT.toFixed(2)}%`
+      }
     };
   }
 
@@ -1513,8 +1792,8 @@ app.post('/api/keepa-roi', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Erreur serveur lors du calcul du ROI'
-    });
-  }
+        });
+    }
 });
 
 // Démarrer le serveur

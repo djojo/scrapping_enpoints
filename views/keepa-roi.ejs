@@ -270,6 +270,10 @@
                 <button type="submit" class="btn" id="submitBtn">
                     🔍 Analyser avec Keepa
                 </button>
+                
+                <button type="button" class="btn" id="demoBtn" style="background: #28a745; margin-left: 1rem;">
+                    🧪 Voir exemple détaillé des frais
+                </button>
             </form>
 
             <div class="loading" id="loading">
@@ -286,6 +290,7 @@
         const loading = document.getElementById('loading');
         const result = document.getElementById('result');
         const submitBtn = document.getElementById('submitBtn');
+        const demoBtn = document.getElementById('demoBtn');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -348,29 +353,82 @@
                             <div class="roi-section">
                                 <h4>${rentabiliteIcon} Analyse de rentabilité</h4>
                                 <div class="sales-info">
-                                    <span class="sales-label">ROI :</span>
-                                    <span class="${roiClass}">${roi.roiPourcentage.toFixed(2)}%</span>
+                                    <span class="sales-label">ROI Net HT :</span>
+                                    <span class="${roiClass}">${roi.roiPourcentageHT?.toFixed(2) || roi.roiPourcentage?.toFixed(2) || 'N/A'}%</span>
                                 </div>
                                 <div class="sales-info">
-                                    <span class="sales-label">Prix de vente :</span>
-                                    <span class="sales-value">${roi.prixVente?.toFixed(2) || 'N/A'}€</span>
+                                    <span class="sales-label">Prix vente TTC :</span>
+                                    <span class="sales-value">${roi.prixVenteTTC?.toFixed(2) || roi.prixVente?.toFixed(2) || 'N/A'}€</span>
                                 </div>
                                 <div class="sales-info">
-                                    <span class="sales-label">Bénéfice brut :</span>
-                                    <span class="sales-value">${roi.beneficeBrut?.toFixed(2) || 'N/A'}€</span>
+                                    <span class="sales-label">Prix vente HT :</span>
+                                    <span class="sales-value">${roi.prixVenteHT?.toFixed(2) || 'N/A'}€</span>
                                 </div>
                                 <div class="sales-info">
-                                    <span class="sales-label">Frais Amazon :</span>
-                                    <span class="sales-value">${roi.fraisAmazon?.toFixed(2) || 'N/A'}€</span>
+                                    <span class="sales-label">Prix achat HT :</span>
+                                    <span class="sales-value">${roi.prixAchatHT?.toFixed(2) || 'N/A'}€</span>
                                 </div>
                                 <div class="sales-info">
-                                    <span class="sales-label">Frais FBA :</span>
-                                    <span class="sales-value">${roi.fraisFBA?.toFixed(2) || 'N/A'}€</span>
+                                    <span class="sales-label">Frais Amazon HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.amazon?.toFixed(2) || roi.frais?.amazon?.toFixed(2) || 'N/A'}€</span>
                                 </div>
                                 <div class="sales-info">
-                                    <span class="sales-label">Bénéfice net :</span>
-                                    <span class="sales-value">${roi.beneficeNet?.toFixed(2) || 'N/A'}€</span>
+                                    <span class="sales-label">Frais FBA HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.fba?.toFixed(2) || roi.frais?.fba?.toFixed(2) || 'N/A'}€</span>
                                 </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Frais port HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.port?.toFixed(2) || roi.frais?.port?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Total frais HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.total?.toFixed(2) || roi.frais?.total?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Bénéfice net HT :</span>
+                                    <span class="sales-value">${roi.beneficeNetHT?.toFixed(2) || roi.beneficeNet?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                ${roi.calculDetail ? `
+                                <div class="calcul-details" style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 8px;">
+                                    <h5>🧮 Détail du calcul ROI HT</h5>
+                                    <div style="font-family: monospace; font-size: 0.9rem; line-height: 1.6;">
+                                        <div><strong>Conversion prix de vente :</strong><br>${roi.calculDetail.prixVenteHT}</div>
+                                        <div><strong>Conversion frais Amazon :</strong><br>${roi.calculDetail.fraisAmazonHT}</div>
+                                        <div><strong>Conversion frais FBA :</strong><br>${roi.calculDetail.fraisFBAHT}</div>
+                                        <div><strong>Conversion frais port :</strong><br>${roi.calculDetail.fraisPortHT}</div>
+                                        <div><strong>Calcul bénéfice :</strong><br>${roi.calculDetail.beneficeCalcul}</div>
+                                        <div style="background: #fff; padding: 0.5rem; border-radius: 4px; border-left: 3px solid #ff6b35;"><strong>ROI final :</strong><br>${roi.calculDetail.roiCalcul}</div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                ${roi.fraisDetails ? `
+                                <div class="frais-details" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                                    <h5>📦 Détails des frais FBA/Port</h5>
+                                    <div class="sales-info">
+                                        <span class="sales-label">Catégorie :</span>
+                                        <span class="sales-value">${roi.fraisDetails.categorieTaille}</span>
+                                    </div>
+                                    ${roi.fraisDetails.dimensions?.volume > 0 ? `
+                                    <div class="sales-info">
+                                        <span class="sales-label">Dimensions :</span>
+                                        <span class="sales-value">${roi.fraisDetails.dimensions.longueur}×${roi.fraisDetails.dimensions.largeur}×${roi.fraisDetails.dimensions.hauteur} cm</span>
+                                    </div>
+                                    <div class="sales-info">
+                                        <span class="sales-label">Poids :</span>
+                                        <span class="sales-value">${roi.fraisDetails.poids?.toFixed(2) || 'N/A'} kg</span>
+                                    </div>
+                                    ` : ''}
+                                    <div class="sales-info">
+                                        <span class="sales-label">Frais base FBA :</span>
+                                        <span class="sales-value">${roi.fraisDetails.fraisBase?.toFixed(2) || 'N/A'}€</span>
+                                    </div>
+                                    <div class="sales-info">
+                                        <span class="sales-label">Stockage mensuel :</span>
+                                        <span class="sales-value">${roi.fraisDetails.fraisStockage?.toFixed(2) || 'N/A'}€</span>
+                                    </div>
+                                    <small style="color: #666; font-style: italic;">${roi.fraisDetails.estimation}</small>
+                                </div>
+                                ` : ''}
                                 <div class="sales-info">
                                     <span class="sales-label">Statut :</span>
                                     <span class="sales-value">${rentabiliteText}</span>
@@ -486,6 +544,157 @@
                 loading.style.display = 'none';
                 submitBtn.disabled = false;
                 submitBtn.textContent = '🔍 Analyser avec Keepa';
+            }
+        });
+
+        // Gestionnaire pour le bouton de démonstration
+        demoBtn.addEventListener('click', async () => {
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            demoBtn.disabled = true;
+            demoBtn.textContent = '🧪 Chargement de l\'exemple...';
+
+            try {
+                const response = await fetch('/api/keepa-roi/demo');
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Utiliser les mêmes variables que pour un vrai résultat
+                    const prixTTC = data.prixTTC.toFixed(2);
+                    const roi = data.roi;
+                    const product = data.product;
+                    const prix = data.prix;
+                    const ventes = data.ventes;
+
+                    let roiSection = '';
+                    if (roi && Object.keys(roi).length > 0) {
+                        const roiClass = roi.roiPourcentage > 0 ? 'roi-value' : 'roi-value roi-negative';
+                        const rentabiliteIcon = roi.rentable ? '✅' : '❌';
+                        const rentabiliteText = roi.rentable ? 'Rentable' : 'Non rentable';
+                        
+                        roiSection = `
+                            <div class="roi-section">
+                                <h4>${rentabiliteIcon} Analyse de rentabilité - DÉMONSTRATION</h4>
+                                <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                                    <strong>🧪 Données de démonstration</strong><br>
+                                    <em>Cet exemple montre le calcul détaillé des frais FBA et de port basé sur les dimensions réelles d'un produit.</em>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">ROI Net HT :</span>
+                                    <span class="${roiClass}">${roi.roiPourcentageHT?.toFixed(2) || roi.roiPourcentage?.toFixed(2) || 'N/A'}%</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Prix vente TTC :</span>
+                                    <span class="sales-value">${roi.prixVenteTTC?.toFixed(2) || roi.prixVente?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Prix vente HT :</span>
+                                    <span class="sales-value">${roi.prixVenteHT?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Prix achat HT :</span>
+                                    <span class="sales-value">${roi.prixAchatHT?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Frais Amazon HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.amazon?.toFixed(2) || roi.frais?.amazon?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Frais FBA HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.fba?.toFixed(2) || roi.frais?.fba?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Frais port HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.port?.toFixed(2) || roi.frais?.port?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Total frais HT :</span>
+                                    <span class="sales-value">${roi.fraisHT?.total?.toFixed(2) || roi.frais?.total?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                <div class="sales-info">
+                                    <span class="sales-label">Bénéfice net HT :</span>
+                                    <span class="sales-value">${roi.beneficeNetHT?.toFixed(2) || roi.beneficeNet?.toFixed(2) || 'N/A'}€</span>
+                                </div>
+                                ${roi.calculDetail ? `
+                                <div class="calcul-details" style="margin-top: 1rem; padding: 1rem; background: #e7f3ff; border-radius: 8px;">
+                                    <h5>🧮 Détail du calcul ROI HT</h5>
+                                    <div style="font-family: monospace; font-size: 0.9rem; line-height: 1.6;">
+                                        <div><strong>Conversion prix de vente :</strong><br>${roi.calculDetail.prixVenteHT}</div>
+                                        <div><strong>Conversion frais Amazon :</strong><br>${roi.calculDetail.fraisAmazonHT}</div>
+                                        <div><strong>Conversion frais FBA :</strong><br>${roi.calculDetail.fraisFBAHT}</div>
+                                        <div><strong>Conversion frais port :</strong><br>${roi.calculDetail.fraisPortHT}</div>
+                                        <div><strong>Calcul bénéfice :</strong><br>${roi.calculDetail.beneficeCalcul}</div>
+                                        <div style="background: #fff; padding: 0.5rem; border-radius: 4px; border-left: 3px solid #ff6b35;"><strong>ROI final :</strong><br>${roi.calculDetail.roiCalcul}</div>
+                                    </div>
+                                </div>
+                                ` : ''}
+                                ${roi.fraisDetails ? `
+                                <div class="frais-details" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                                    <h5>📦 Détails des frais FBA/Port</h5>
+                                    <div class="sales-info">
+                                        <span class="sales-label">Catégorie :</span>
+                                        <span class="sales-value">${roi.fraisDetails.categorieTaille}</span>
+                                    </div>
+                                    ${roi.fraisDetails.dimensions?.volume > 0 ? `
+                                    <div class="sales-info">
+                                        <span class="sales-label">Dimensions :</span>
+                                        <span class="sales-value">${roi.fraisDetails.dimensions.longueur}×${roi.fraisDetails.dimensions.largeur}×${roi.fraisDetails.dimensions.hauteur} cm</span>
+                                    </div>
+                                    <div class="sales-info">
+                                        <span class="sales-label">Poids :</span>
+                                        <span class="sales-value">${roi.fraisDetails.poids?.toFixed(2) || 'N/A'} kg</span>
+                                    </div>
+                                    ` : ''}
+                                    <div class="sales-info">
+                                        <span class="sales-label">Frais base FBA :</span>
+                                        <span class="sales-value">${roi.fraisDetails.fraisBase?.toFixed(2) || 'N/A'}€</span>
+                                    </div>
+                                    <div class="sales-info">
+                                        <span class="sales-label">Stockage mensuel :</span>
+                                        <span class="sales-value">${roi.fraisDetails.fraisStockage?.toFixed(2) || 'N/A'}€</span>
+                                    </div>
+                                    <small style="color: #666; font-style: italic;">${roi.fraisDetails.estimation}</small>
+                                </div>
+                                ` : ''}
+                                <div class="sales-info">
+                                    <span class="sales-label">Statut :</span>
+                                    <span class="sales-value">${rentabiliteText}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    showResult('success', `
+                        <h3>🧪 Démonstration du calcul des frais FBA et de port</h3>
+                        <div class="product-info">
+                            <h4>📦 Informations produit</h4>
+                            <p><strong>Titre :</strong> ${product.title}</p>
+                            <p><strong>Marque :</strong> ${product.brand}</p>
+                            <p><strong>ASIN :</strong> ${product.asin}</p>
+                            <p><strong>Domaine :</strong> ${product.domain}</p>
+                            <p><strong>Prix d'achat HT :</strong> ${data.prixHT.toFixed(2)}€</p>
+                            <p><strong>Prix d'achat TTC :</strong> ${prixTTC}€</p>
+                        </div>
+                        ${roiSection}
+                    `);
+
+                } else {
+                    showResult('error', `
+                        <h3>❌ Erreur</h3>
+                        <p>Impossible de charger l'exemple de démonstration.</p>
+                    `);
+                }
+
+            } catch (error) {
+                showResult('error', `
+                    <h3>❌ Erreur de réseau</h3>
+                    <p>Impossible de contacter le serveur. Veuillez réessayer.</p>
+                    <p><small>Détail : ${error.message}</small></p>
+                `);
+            } finally {
+                loading.style.display = 'none';
+                demoBtn.disabled = false;
+                demoBtn.textContent = '🧪 Voir exemple détaillé des frais';
             }
         });
 
